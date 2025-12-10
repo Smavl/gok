@@ -2,20 +2,23 @@
 
 - [x] Minimal POC for single connection
 - [ ] CLI flags
-    - [ ] Switch to kong? [kong](https://github.com/alecthomas/kong) 
-- [ ] Add features to Core 
-    - [ ] Listeners
-    - [ ] Sessions
-- [ ] Add simple menu handling (Channels?)
-    - [ ] 
+    - [x] Switch to kong? [kong](https://github.com/alecthomas/kong) 
+    - [ ] Automatically drop into shell (default)
+- [x] Add features to Core 
+    - [x] Listeners
+    - [x] Sessions
+- [x] Add simple menu handling (Channels?)
+    - [x] View Sessions, and listners
+    - [x] Interact with session
+    - [ ] Add help menu
+- [x] testing "Setup" 
 - [ ] Testing
     - [ ] Parsing of CLI flags (add option to "show flags" to unit test)
-    - [ ] More streamlined testing setup?
+    - [x] More streamlined testing setup?
 - [ ] Reflect on architechture 
-    - [ ] Need more ..Handlers? (Session, Listener)
     - [ ] Refactor/simplify?
 - [ ] Interactive shell handling
-- [ ] 
+    - [x] Add escaping from session
 
 
 # TODO (Long term)
@@ -23,6 +26,10 @@
 ## Shell 
 
 - [ ] OS detection
+    - [ ] linux
+    - [ ] windows
+- [ ] Session handling
+    - [ ] print history after entering session again
 - [ ] Prober
     - [ ] Find binaries
     - [ ] Parse env
@@ -40,11 +47,14 @@
 
 ## Test Scenarios
 
+- [x] Port range is parsed correctly
 - [ ] Listen on range -> multiple sessions -> Change between sessions
+    - [x] Simple testing
+    - [ ] Test with multiple real sessions
 - [ ] Upload file
 - [ ] Upload file
 
-### Utility
+## Utility
 
 - [ ] Uploading files
     - [ ] curl, wget
@@ -64,5 +74,5 @@
 - [ ] Print Different payloads!
 
 ### CLI flags
-- [ ] Ports: "-p 9001", "-p 9001-9009" (Maybe "-p 9001 9003"?)
+- [x] Ports: "-p 9001", "-p 9001-9009" (Maybe "-p 9001 9003"?)
 
