@@ -47,11 +47,11 @@ func (p *PortRange) Decode(ctx *kong.DecodeContext) error {
 
 		end, err := strconv.Atoi(split[1])
 		if err != nil {
-			return fmt.Errorf("invalid end port: %s", split[1])
+			return fmt.Errorf("Invalid end port: %s", split[1])
 		}
 
 		if start > end {
-			return fmt.Errorf("start port %d is greater than end port %d", start, end)
+			return fmt.Errorf("Start port %d is greater than end port %d", start, end)
 		}
 		count := end - start + 1
 		p.Ports = make([]int, count)
@@ -63,7 +63,7 @@ func (p *PortRange) Decode(ctx *kong.DecodeContext) error {
 		// single port
 		port, err := strconv.Atoi(value)
 		if err != nil {
-			return fmt.Errorf("Invalid port: %d", port)
+			return fmt.Errorf("Invalid port value: %v", err)
 		}
 
 		p.Ports = []int{port}

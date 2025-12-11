@@ -16,12 +16,12 @@ import (
 
 func (c *Core) EnableMainMenuMode() {
 	// very nice go, no options!
-	c.activeSessionID = -1
+	c.activeShellID = -1
 }
 
 func (c *Core) EnableShellMode() {
-	session := c.sessions[c.activeSessionID]
-
+	session, _ := c.SessionManager.Get(c.activeShellID)
+	// TODO: error handling
 
 	// start reader (only once)
 	session.mu.Lock()
@@ -36,19 +36,19 @@ func (c *Core) EnableShellMode() {
 }
 
 type Core struct {
-	id_counter int
 	mu     sync.RWMutex
 	Config Config
 	listeners map[string]*Listener
-	sessions  map[int]*Session
+
+	// sessions  map[int]*Session
+	SessionManager *SessionManager
 
 	// shell
-	activeSessionID int
+	activeShellID int
 
 	// Event Channels
 	newSession chan *Session
 	// sessionDied chan *Session
-	input      chan string
 }
 
 type Listener struct {
@@ -58,26 +58,18 @@ type Listener struct {
 	listener net.Listener
 }
 
-type Session struct {
-	ID   int
-	Conn net.Conn
-	Addr string
-	started bool
-	mu sync.Mutex
-}
 
 
 func NewCore(cfg Config) *Core {
 	return &Core{
-		id_counter: 0,
 		Config:    cfg,
+		// managers
 		listeners: make(map[string]*Listener),
-		sessions:  make(map[int]*Session),
+		SessionManager: NewSessionManager(),
 
 		// channels
 		newSession: make(chan *Session),
 		// sessionDied: make(chan *Session),
-		input:      make(chan string),
 	}
 }
 
@@ -102,12 +94,6 @@ func (c *Core) InitListeners() {
 	fmt.Printf("\n[*] Waiting for connections...\n")
 }
 
-func (c *Core) inc_id() int {
-	res := c.id_counter
-	c.id_counter += 1
-	return res
-}
-
 func (c *Core) StartListener(addr string, port int) (*Listener, error) {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
@@ -130,15 +116,7 @@ func (c *Core) StartListener(addr string, port int) (*Listener, error) {
 			}
 
 			// create session
-			session := &Session{
-				ID:   c.inc_id(),
-				Conn: conn,
-				Addr: conn.RemoteAddr().String(),
-			}
-
-			c.mu.Lock()
-			c.sessions[session.ID] = session
-			c.mu.Unlock()
+			session := c.SessionManager.AddSession(conn)
 
 
 			// announce to channel
@@ -163,7 +141,8 @@ func (c *Core) runMenuReader() {
 // Shell reader (raw terminal ):
 // TODO: add x/term later
 func (c *Core) runShellReader() {
-	session := c.sessions[c.activeSessionID]
+	session, _ := c.SessionManager.Get(c.activeShellID)
+	// TODO: error handling
 
 	// workaround for resuming session
 	session.Conn.Write([]byte("\n"))
@@ -211,8 +190,8 @@ func (c *Core) RunREPL() {
 func (c *Core) handleMainMenu(input string) {
 	// split on all whitespace
 	args := strings.Fields(input)
-	len_args := len(args)
-	if len_args == 0 {
+	lenArgs := len(args)
+	if lenArgs == 0 {
 		return
 	}
 	defer fmt.Print("\nGOK > ")
@@ -233,16 +212,14 @@ func (c *Core) handleMainMenu(input string) {
 		c.mu.RUnlock()
 
 	case "sessions", "sesh", "sess", "s":
-		c.mu.RLock()
-		if len(c.sessions) == 0 {
+		if c.SessionManager.GetAmount() == 0 {
 			fmt.Println("\n[!] No active sessions")
 		} else {
 			fmt.Println("\nActive Sessions:")
-			for id, sess := range c.sessions {
-				fmt.Printf("\t[%d] %s\n", id, sess.Addr)
+			for _, sess := range c.SessionManager.GetSessions() {
+				fmt.Printf("\t[%d] %s\n", sess.ID, sess.Addr)
 			}
 		}
-		c.mu.RUnlock()
 	// fmt.Print("\nGOK > ")
 
 	case "interact", "int", "i":
@@ -253,20 +230,23 @@ func (c *Core) handleMainMenu(input string) {
 				fmt.Printf("Id: %v is not a number",id)
 			}
 
-			c.mu.RLock()
-			_, ok := c.sessions[id]
-			c.activeSessionID = id
-			c.mu.RUnlock()
-			if !ok {
-				fmt.Printf("Session #%d not found",id)
-			} else {
+			sessionExists := c.SessionManager.Exists(id)
+
+			if sessionExists {
+				c.activeShellID = id
 				fmt.Printf("[*] Session #%v: Dropping into shell..\n",id)
 				c.EnableShellMode()
+			} else {
+				fmt.Printf("Session #%d not found",id)
 			}
 
 		} else {
 			fmt.Println("[!] No session chosen, or invalid argument")
 		}
+
+	case "exit", "quit":
+		// TODO: Need to do more?
+		os.Exit(0)
 
 	default:
 		// TODO: Add help suggestion

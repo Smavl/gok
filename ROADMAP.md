@@ -10,6 +10,7 @@
 - [x] Add simple menu handling (Channels?)
     - [x] View Sessions, and listners
     - [x] Interact with session
+    - [ ] Kill sessions
     - [ ] Add help menu
 - [x] testing "Setup" 
 - [ ] Testing
