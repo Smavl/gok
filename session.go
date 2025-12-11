@@ -1,34 +1,47 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 )
 
+type SessionState int
+
+const (
+	StateIdle SessionState = iota
+	StateActive
+	StateBackgrounded
+	StateDead
+)
+
 type Session struct {
-	ID   int
-	Conn net.Conn
+	ID int
+
+	conn net.Conn
 	Addr string
-	started bool
-	mu sync.Mutex
+
+	mu           sync.Mutex
+	state        SessionState
+	outputBuffer bytes.Buffer
+	stopChan     chan struct{}
 }
 
 type SessionManager struct {
-	mu sync.RWMutex
-	id_counter int
-	sessions  map[int]*Session
+	mu            sync.RWMutex
+	id_counter    int
+	sessions      map[int]*Session
 	activeShellID int
 }
-
 
 func NewSessionManager() *SessionManager {
 	return &SessionManager{
 		id_counter: 0,
-		sessions: make(map[int]*Session),
+		sessions:   make(map[int]*Session),
 	}
 }
-
 
 func (sm *SessionManager) incID() int {
 	sm.mu.Lock()
@@ -41,7 +54,7 @@ func (sm *SessionManager) incID() int {
 func (sm *SessionManager) AddSession(conn net.Conn) *Session {
 	session := Session{
 		ID:   sm.incID(),
-		Conn: conn,
+		conn: conn,
 		Addr: conn.RemoteAddr().String(),
 	}
 
@@ -49,9 +62,9 @@ func (sm *SessionManager) AddSession(conn net.Conn) *Session {
 	sm.sessions[session.ID] = &session
 	sm.mu.Unlock()
 
+	session.Start()
 	return &session
 }
-
 
 func (sm *SessionManager) GetAmount() int {
 	sm.mu.RLock()
@@ -63,9 +76,9 @@ func (sm *SessionManager) GetSessions() []*Session {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	sessions := make([]*Session, 0,len(sm.sessions))
+	sessions := make([]*Session, 0, len(sm.sessions))
 	for _, sess := range sm.sessions {
-		sessions = append(sessions,sess)
+		sessions = append(sessions, sess)
 	}
 	return sessions
 }
@@ -77,7 +90,7 @@ func (sm *SessionManager) Exists(ID int) bool {
 	return ok
 }
 
-func (sm *SessionManager) Get(ID int) (*Session,error) {
+func (sm *SessionManager) Get(ID int) (*Session, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	sesh, ok := sm.sessions[ID]
@@ -95,6 +108,75 @@ func (sm *SessionManager) SetActive(ID int) {
 	sm.activeShellID = ID
 }
 
-// func (sm *SessionManager) GetActive(ID int) { 
-// 	sm.Get()
-// }
+func (s *Session) Start() {
+	s.mu.Lock()
+	s.state = StateBackgrounded
+	s.stopChan = make(chan struct{})
+	s.mu.Unlock()
+
+	go s.outputLoop()
+}
+
+func (s *Session) outputLoop() {
+	buf := make([]byte, 4096)
+
+	for {
+		select {
+		// stop 
+		case <-s.stopChan:
+			return
+		default:
+			n, err := s.conn.Read(buf)
+			if err != nil {
+				s.mu.Lock()
+				s.state = StateDead
+				s.mu.Unlock()
+				return
+			}
+
+			if n > 0 {
+				data := buf[:n]
+
+				s.mu.Lock()
+				// Defines behavior of Background, Foreground
+				switch s.state {
+				case StateActive:
+					os.Stdout.Write(data)
+				case StateBackgrounded:
+					s.outputBuffer.Write(data)
+				case StateDead:
+					s.mu.Unlock()
+					return
+				}
+				s.mu.Unlock()
+			}
+		}
+	}
+}
+
+func (s *Session) Foreground() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state = StateActive
+
+	
+	if s.outputBuffer.Len() > 0 {
+		os.Stdout.Write(s.outputBuffer.Bytes())
+		s.outputBuffer.Reset()
+	}
+
+}
+
+func (s *Session) Background() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state = StateBackgrounded
+}
+func (s *Session) Stop() {
+	s.mu.Lock()
+	s.state = StateDead 
+	s.mu.Unlock()
+
+	close(s.stopChan)
+	s.conn.Close()
+}

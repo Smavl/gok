@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -15,24 +14,24 @@ import (
 // TODO: string??
 
 func (c *Core) EnableMainMenuMode() {
-	// very nice go, no options!
 	c.activeShellID = -1
+	c.inShell = false
 }
 
 func (c *Core) EnableShellMode() {
 	session, _ := c.SessionManager.Get(c.activeShellID)
 	// TODO: error handling
 
-	// start reader (only once)
-	session.mu.Lock()
-	if !session.started {
-		session.started = true
-		// TODO: Revisit. Might look funny if active session dies in the background
-		go io.Copy(os.Stdout,session.Conn)
-	}
-	session.mu.Unlock()
+	c.inShell = true
+
+	// Bring session to foreground (drains buffer, makes output live)
+	session.Foreground()
+
 	// drop into shell (blocking)
 	c.runShellReader()
+
+	// When user escapes, background the session
+	session.Background()
 }
 
 type Core struct {
@@ -45,6 +44,7 @@ type Core struct {
 
 	// shell
 	activeShellID int
+	inShell bool
 
 	// Event Channels
 	newSession chan *Session
@@ -145,7 +145,7 @@ func (c *Core) runShellReader() {
 	// TODO: error handling
 
 	// workaround for resuming session
-	session.Conn.Write([]byte("\n"))
+	session.conn.Write([]byte("\n"))
 
 	// For now, simple line-based with escape check
 	scanner := bufio.NewScanner(os.Stdin)
@@ -159,7 +159,7 @@ func (c *Core) runShellReader() {
 		}
 
 		// Send to remote
-		session.Conn.Write([]byte(input + "\n"))
+		session.conn.Write([]byte(input + "\n"))
 	}
 }
 
@@ -174,8 +174,10 @@ func (c *Core) RunREPL() {
 
 		// session Channels:
 		case sess := <-c.newSession:
-			fmt.Printf("\n[+] New session #%d from %s\n", sess.ID, sess.Addr)
-			fmt.Print("GOK > ")
+			if !c.inShell {
+				fmt.Printf("\n[+] New session #%d from %s\n", sess.ID, sess.Addr)
+				fmt.Print("GOK > ")
+			}
 
 		// User input channels
 		// case input := <-c.input:
