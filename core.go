@@ -13,25 +13,22 @@ import (
 
 // TODO: string??
 
-func (c *Core) EnableMainMenuMode() {
-	c.activeShellID = -1
-	c.inShell = false
-}
-
 func (c *Core) EnableShellMode() {
 	session, _ := c.SessionManager.Get(c.activeShellID)
 	// TODO: error handling
 
-	c.inShell = true
 
-	// Bring session to foreground (drains buffer, makes output live)
+	// Bring session to foreground (redirect buffer output to "stdout")
 	session.Foreground()
+	oldMenuMode := c.Mode
+	c.Mode = &ShellMode{}
 
 	// drop into shell (blocking)
 	c.runShellReader()
 
-	// When user escapes, background the session
+	// When session is escaped: background the session
 	session.Background()
+	c.Mode = oldMenuMode
 }
 
 type Core struct {
@@ -42,9 +39,11 @@ type Core struct {
 	// sessions  map[int]*Session
 	SessionManager *SessionManager
 
+	Display Display
+	Mode Mode
+
 	// shell
 	activeShellID int
-	inShell bool
 
 	// Event Channels
 	newSession chan *Session
@@ -61,11 +60,19 @@ type Listener struct {
 
 
 func NewCore(cfg Config) *Core {
+	terminalDisplay := NewTerminalDisplay()
+	// NOTE: Do we need a proper constructor?
+	menuMode := MenuMode{
+		Display: terminalDisplay,
+	}
 	return &Core{
 		Config:    cfg,
 		// managers
 		listeners: make(map[string]*Listener),
-		SessionManager: NewSessionManager(),
+		SessionManager: NewSessionManager(terminalDisplay),
+
+		Display: terminalDisplay,
+		Mode: &menuMode,
 
 		// channels
 		newSession: make(chan *Session),
@@ -74,11 +81,11 @@ func NewCore(cfg Config) *Core {
 }
 
 func (c *Core) InitListeners() {
-	fmt.Printf("[+] Initializing listeners:\n\t")
+	c.Message("[+] Initializing listeners:\n\t")
 
 	for _, addr := range c.Config.bindIps {
 		for _, port := range c.Config.PortRange.Ports {
-			fmt.Printf("%s:%d ", addr, port)
+			c.Message("%s:%d ", addr, port)
 
 			l, err := c.StartListener(addr, port)
 			if err != nil {
@@ -91,7 +98,16 @@ func (c *Core) InitListeners() {
 		}
 
 	}
-	fmt.Printf("\n[*] Waiting for connections...\n")
+	c.Message("\n[*] Waiting for connections...\n")
+}
+
+func (c *Core) Prompt() {
+	c.Display.Prompt()
+}
+
+func (c *Core) Message(format string, a ...any) {
+	msg := fmt.Sprintf(format, a...)
+	c.Display.Message(msg)
 }
 
 func (c *Core) StartListener(addr string, port int) (*Listener, error) {
@@ -131,7 +147,7 @@ func (c *Core) StartListener(addr string, port int) (*Listener, error) {
 // read handlers
 // Menu reader (line-buffered)
 func (c *Core) runMenuReader() {
-	fmt.Print("GOK > ")
+	c.Prompt()
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		c.handleMainMenu(scanner.Text())
@@ -154,7 +170,6 @@ func (c *Core) runShellReader() {
 
 		// Check for escape
 		if input == "exit" || input == "~~~" {
-			c.EnableMainMenuMode()
 			return  // Exit this reader
 		}
 
@@ -162,7 +177,6 @@ func (c *Core) runShellReader() {
 		session.conn.Write([]byte(input + "\n"))
 	}
 }
-
 
 
 func (c *Core) RunREPL() {
@@ -174,10 +188,7 @@ func (c *Core) RunREPL() {
 
 		// session Channels:
 		case sess := <-c.newSession:
-			if !c.inShell {
-				fmt.Printf("\n[+] New session #%d from %s\n", sess.ID, sess.Addr)
-				fmt.Print("GOK > ")
-			}
+			c.Mode.OnNewSession(sess)
 
 		// User input channels
 		// case input := <-c.input:
@@ -192,11 +203,12 @@ func (c *Core) RunREPL() {
 func (c *Core) handleMainMenu(input string) {
 	// split on all whitespace
 	args := strings.Fields(input)
-	lenArgs := len(args)
-	if lenArgs == 0 {
+	
+	defer c.Prompt()
+
+	if len(args) == 0 {
 		return
 	}
-	defer fmt.Print("\nGOK > ")
 
 	subCmd := args[0]
 	switch subCmd {
@@ -204,46 +216,46 @@ func (c *Core) handleMainMenu(input string) {
 	case "listeners", "lis", "l":
 		c.mu.RLock()
 		if len(c.listeners) == 0 {
-			fmt.Println("[!] No active listeners")
+			c.Message("[!] No active listeners\n")
 		} else {
-			fmt.Println("\nListeners:")
+			c.Message("\nListeners:\n")
 			for lis := range c.listeners {
-				fmt.Printf("- %v\n", lis)
+				c.Message("- %v\n", lis)
 			}
 		}
 		c.mu.RUnlock()
 
 	case "sessions", "sesh", "sess", "s":
 		if c.SessionManager.GetAmount() == 0 {
-			fmt.Println("\n[!] No active sessions")
+			c.Message("\n[!] No active sessions\n")
 		} else {
-			fmt.Println("\nActive Sessions:")
+			c.Message("\nActive Sessions:\n")
 			for _, sess := range c.SessionManager.GetSessions() {
-				fmt.Printf("\t[%d] %s\n", sess.ID, sess.Addr)
+				c.Message("\t[%d] %s\n", sess.ID, sess.Addr)
 			}
 		}
-	// fmt.Print("\nGOK > ")
+	// c.Prompt()
 
 	case "interact", "int", "i":
 		// check if session arg is supplied
 		if len(args) == 2 {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {
-				fmt.Printf("Id: %v is not a number",id)
+				c.Message("Id: %v is not a number\n",id)
 			}
 
 			sessionExists := c.SessionManager.Exists(id)
 
 			if sessionExists {
 				c.activeShellID = id
-				fmt.Printf("[*] Session #%v: Dropping into shell..\n",id)
+				c.Message("[*] Session #%v: Dropping into shell..\n",id)
 				c.EnableShellMode()
 			} else {
-				fmt.Printf("Session #%d not found",id)
+				c.Message("Session #%d not found\n",id)
 			}
 
 		} else {
-			fmt.Println("[!] No session chosen, or invalid argument")
+			c.Message("[!] No session chosen, or invalid argument\n")
 		}
 
 	case "exit", "quit":
@@ -252,6 +264,6 @@ func (c *Core) handleMainMenu(input string) {
 
 	default:
 		// TODO: Add help suggestion
-		fmt.Printf("[!] Unknown command: %s", subCmd)
+		c.Message("[!] Unknown command: %s\n", subCmd)
 	}
 }

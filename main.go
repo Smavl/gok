@@ -46,7 +46,6 @@ func main() {
 
     core := NewCore(config)
     core.InitListeners()
-    core.EnableMainMenuMode()
 
     core.RunREPL()
 }

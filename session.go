@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
-	"os"
 	"sync"
 )
 
@@ -27,6 +27,7 @@ type Session struct {
 	state        SessionState
 	outputBuffer bytes.Buffer
 	stopChan     chan struct{}
+	display      io.Writer
 }
 
 type SessionManager struct {
@@ -34,12 +35,14 @@ type SessionManager struct {
 	id_counter    int
 	sessions      map[int]*Session
 	activeShellID int
+	display       Display
 }
 
-func NewSessionManager() *SessionManager {
+func NewSessionManager(display Display) *SessionManager {
 	return &SessionManager{
 		id_counter: 0,
 		sessions:   make(map[int]*Session),
+		display:    display,
 	}
 }
 
@@ -53,9 +56,10 @@ func (sm *SessionManager) incID() int {
 
 func (sm *SessionManager) AddSession(conn net.Conn) *Session {
 	session := Session{
-		ID:   sm.incID(),
-		conn: conn,
-		Addr: conn.RemoteAddr().String(),
+		ID:      sm.incID(),
+		conn:    conn,
+		Addr:    conn.RemoteAddr().String(),
+		display: sm.display,
 	}
 
 	sm.mu.Lock()
@@ -122,7 +126,7 @@ func (s *Session) outputLoop() {
 
 	for {
 		select {
-		// stop 
+		// stop
 		case <-s.stopChan:
 			return
 		default:
@@ -141,7 +145,7 @@ func (s *Session) outputLoop() {
 				// Defines behavior of Background, Foreground
 				switch s.state {
 				case StateActive:
-					os.Stdout.Write(data)
+					s.display.Write(data)
 				case StateBackgrounded:
 					s.outputBuffer.Write(data)
 				case StateDead:
@@ -159,9 +163,8 @@ func (s *Session) Foreground() {
 	defer s.mu.Unlock()
 	s.state = StateActive
 
-	
 	if s.outputBuffer.Len() > 0 {
-		os.Stdout.Write(s.outputBuffer.Bytes())
+		s.display.Write(s.outputBuffer.Bytes())
 		s.outputBuffer.Reset()
 	}
 
@@ -174,7 +177,7 @@ func (s *Session) Background() {
 }
 func (s *Session) Stop() {
 	s.mu.Lock()
-	s.state = StateDead 
+	s.state = StateDead
 	s.mu.Unlock()
 
 	close(s.stopChan)
