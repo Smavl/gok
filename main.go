@@ -45,7 +45,6 @@ func main() {
     }
 
     core := NewCore(config)
-    core.InitListeners()
 
-    core.RunREPL()
+    core.Start()
 }

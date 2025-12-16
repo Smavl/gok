@@ -1,43 +1,21 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"fmt"
-	"log"
-	"net"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
+
+	"golang.org/x/term"
 )
 
-// TODO: string??
-
-func (c *Core) EnableShellMode() {
-	session, _ := c.SessionManager.Get(c.activeShellID)
-	// TODO: error handling
-
-
-	// Bring session to foreground (redirect buffer output to "stdout")
-	session.Foreground()
-	oldMenuMode := c.Mode
-	c.Mode = &ShellMode{}
-
-	// drop into shell (blocking)
-	c.runShellReader()
-
-	// When session is escaped: background the session
-	session.Background()
-	c.Mode = oldMenuMode
-}
-
 type Core struct {
-	mu     sync.RWMutex
-	Config Config
-	listeners map[string]*Listener
+	mu               sync.RWMutex
+	Config           Config
+	menuReaderCancel context.CancelFunc
 
-	// sessions  map[int]*Session
-	SessionManager *SessionManager
+	SessionManager       *SessionManager
+	ShellListenerManager *ShellListenerManager
 
 	Display Display
 	Mode Mode
@@ -46,60 +24,61 @@ type Core struct {
 	activeShellID int
 
 	// Event Channels
-	newSession chan *Session
-	// sessionDied chan *Session
+	eventChan chan Event
 }
-
-type Listener struct {
-	// id int
-	address  string
-	port     int
-	listener net.Listener
-}
-
-
 
 func NewCore(cfg Config) *Core {
 	terminalDisplay := NewTerminalDisplay()
 	// NOTE: Do we need a proper constructor?
-	menuMode := MenuMode{
-		Display: terminalDisplay,
-	}
-	return &Core{
-		Config:    cfg,
+	menuMode := MenuMode{Display: terminalDisplay}
+	sm := NewSessionManager(terminalDisplay)
+	eventChan := make(chan Event)
+	slm := NewShellListenerManager(sm, terminalDisplay, eventChan)
+	core := Core{
+		Config: cfg,
 		// managers
-		listeners: make(map[string]*Listener),
-		SessionManager: NewSessionManager(terminalDisplay),
+		SessionManager:       sm,
+		ShellListenerManager: slm,
 
 		Display: terminalDisplay,
-		Mode: &menuMode,
+		Mode:    &menuMode,
 
 		// channels
-		newSession: make(chan *Session),
-		// sessionDied: make(chan *Session),
+		eventChan: eventChan,
 	}
+	core.ShellListenerManager.Init(cfg)
+	return &core
 }
 
-func (c *Core) InitListeners() {
-	c.Message("[+] Initializing listeners:\n\t")
+func (c *Core) EnableShellMode() {
+	session, _ := c.SessionManager.Get(c.activeShellID)
+	// TODO: error handling
 
-	for _, addr := range c.Config.bindIps {
-		for _, port := range c.Config.PortRange.Ports {
-			c.Message("%s:%d ", addr, port)
-
-			l, err := c.StartListener(addr, port)
-			if err != nil {
-				log.Printf("[-] Failed to start listener on %s:%d: %v", addr, port, err)
-				continue
-			}
-			c.mu.Lock()
-			c.listeners[fmt.Sprintf("%s:%d", addr, port)] = l
-			c.mu.Unlock()
-		}
-
+	// Stop the menu reader goroutine so it releases stdin
+	c.mu.Lock()
+	if c.menuReaderCancel != nil {
+		c.menuReaderCancel()
+		c.menuReaderCancel = nil
 	}
-	c.Message("\n[*] Waiting for connections...\n")
+	c.mu.Unlock()
+
+	// Bring session to foreground (redirect buffer output to "stdout")
+	session.Foreground()
+	oldMenuMode := c.Mode
+	c.Mode = &ShellMode{Display: c.Display}
+
+	// drop into shell (blocking)
+	c.runShellReader()
+
+	// When session is escaped: background the session
+	session.Background()
+	c.Mode = oldMenuMode
+
+	// Restart the menu reader goroutine now that we're back in menu mode
+	c.startMenuReader()
 }
+
+
 
 func (c *Core) Prompt() {
 	c.Display.Prompt()
@@ -110,160 +89,111 @@ func (c *Core) Message(format string, a ...any) {
 	c.Display.Message(msg)
 }
 
-func (c *Core) StartListener(addr string, port int) (*Listener, error) {
-
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
-	if err != nil {
-		return nil, fmt.Errorf("Failed to start listener: %v", err)
-	}
-
-	l := &Listener{
-		port:     port,
-		listener: listener,
-	}
-
-	go func() {
-		defer listener.Close()
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("[-] Error accepting connection: %v", err)
-				continue
-			}
-
-			// create session
-			session := c.SessionManager.AddSession(conn)
-
-
-			// announce to channel
-			c.newSession <- session
-
-		}
-	}()
-
-	return l, nil
-}
 
 // read handlers
-// Menu reader (line-buffered)
-func (c *Core) runMenuReader() {
+
+// Menu reader, reads byte-by-byte but is line-buffered
+func (c *Core) runMenuReader(ctx context.Context) {
+	// This reader is cancellable. 
+	var lineBuffer []byte
+	buf := make([]byte, 1)
+
 	c.Prompt()
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		c.handleMainMenu(scanner.Text())
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			n, err := os.Stdin.Read(buf)
+			if err != nil || n == 0 {
+				// NOTE: This will cause the reader to exit if stdin is closed.
+				return
+			}
+			
+			// Simple line assembly
+			if buf[0] == '\n' {
+				c.eventChan <- UserInputEvent{io: string(lineBuffer)}
+				lineBuffer = []byte{}
+			} else if buf[0] != '\r' { // Ignore carriage returns
+				lineBuffer = append(lineBuffer, buf[0])
+			}
+		}
 	}
 }
 
-// Shell reader (raw terminal ):
-// TODO: add x/term later
+// Shell reader (raw terminal):
 func (c *Core) runShellReader() {
 	session, _ := c.SessionManager.Get(c.activeShellID)
 	// TODO: error handling
 
-	// workaround for resuming session
-	session.conn.Write([]byte("\n"))
-
-	// For now, simple line-based with escape check
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		input := scanner.Text()
-
-		// Check for escape
-		if input == "exit" || input == "~~~" {
-			return  // Exit this reader
-		}
-
-		// Send to remote
-		session.conn.Write([]byte(input + "\n"))
-	}
-}
-
-
-func (c *Core) RunREPL() {
-	// Start reader
-	go c.runMenuReader()
-
-	for {
-		select {
-
-		// session Channels:
-		case sess := <-c.newSession:
-			c.Mode.OnNewSession(sess)
-
-		// User input channels
-		// case input := <-c.input:
-		// 	c.handleMainMenu(input)
-
-		}
-
-	}
-
-}
-
-func (c *Core) handleMainMenu(input string) {
-	// split on all whitespace
-	args := strings.Fields(input)
-	
-	defer c.Prompt()
-
-	if len(args) == 0 {
+	fd := int(os.Stdin.Fd())
+	oldState, err := term.MakeRaw(fd)
+	if err != nil {
+		c.Message("Failed to enter raw mode %v\n", err)
 		return
 	}
+	defer term.Restore(fd, oldState)
 
-	subCmd := args[0]
-	switch subCmd {
-	// Management
-	case "listeners", "lis", "l":
-		c.mu.RLock()
-		if len(c.listeners) == 0 {
-			c.Message("[!] No active listeners\n")
-		} else {
-			c.Message("\nListeners:\n")
-			for lis := range c.listeners {
-				c.Message("- %v\n", lis)
-			}
+	// Enable raw mode output conversion
+	if td, ok := c.Display.(*TerminalDisplay); ok {
+		td.SetRawMode(true)
+		defer td.SetRawMode(false)
+	}
+
+	// workaround for resuming session
+	session.Write([]byte("\n"))
+
+	// Read byte-by-byte in raw mode
+	buf := make([]byte, 1)
+	for {
+		n, err := os.Stdin.Read(buf)
+		if err != nil {
+			return
 		}
-		c.mu.RUnlock()
-
-	case "sessions", "sesh", "sess", "s":
-		if c.SessionManager.GetAmount() == 0 {
-			c.Message("\n[!] No active sessions\n")
-		} else {
-			c.Message("\nActive Sessions:\n")
-			for _, sess := range c.SessionManager.GetSessions() {
-				c.Message("\t[%d] %s\n", sess.ID, sess.Addr)
+		if n > 0 {
+			// Check for escape (Ctrl+D = 0x04)
+			if buf[0] == 0x04 {
+				c.Message("\r\n")
+				return
 			}
+
+			// Convert CR to LF for Unix shells
+			// FIX: HMMM without this the overal shell doesnt wrap properly (even when exiting???)
+			if buf[0] == '\r' {
+				buf[0] = '\n'
+			}
+
+			// Forward to remote shell
+			session.Write(buf[:n])
 		}
-	// c.Prompt()
+	}
+}
 
-	case "interact", "int", "i":
-		// check if session arg is supplied
-		if len(args) == 2 {
-			id, err := strconv.Atoi(args[1])
-			if err != nil {
-				c.Message("Id: %v is not a number\n",id)
-			}
+func (c *Core) handleEvent(e Event) {
+	switch evt := e.(type) {
+	case NewSessionEvent:
+		c.Mode.OnNewSession(evt.Session)
+	case UserInputEvent:
+		c.Mode.HandleInput(evt.io, c)
+	}
+}
 
-			sessionExists := c.SessionManager.Exists(id)
+func (c *Core) startMenuReader() {
+	c.mu.Lock()
+	// Create a new context and cancel function for the reader
+	ctx, cancel := context.WithCancel(context.Background())
+	c.menuReaderCancel = cancel
+	go c.runMenuReader(ctx)
+	c.mu.Unlock()
+}
 
-			if sessionExists {
-				c.activeShellID = id
-				c.Message("[*] Session #%v: Dropping into shell..\n",id)
-				c.EnableShellMode()
-			} else {
-				c.Message("Session #%d not found\n",id)
-			}
+func (c *Core) Start() {
+	// Start the first instance of the menu reader
+	c.startMenuReader()
 
-		} else {
-			c.Message("[!] No session chosen, or invalid argument\n")
-		}
-
-	case "exit", "quit":
-		// TODO: Need to do more?
-		os.Exit(0)
-
-	default:
-		// TODO: Add help suggestion
-		c.Message("[!] Unknown command: %s\n", subCmd)
+	// Process events from the single channel
+	for e := range c.eventChan {
+		c.handleEvent(e)
 	}
 }

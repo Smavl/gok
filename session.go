@@ -31,16 +31,15 @@ type Session struct {
 }
 
 type SessionManager struct {
-	mu            sync.RWMutex
-	id_counter    int
-	sessions      map[int]*Session
-	activeShellID int
-	display       Display
+	mu         sync.RWMutex
+	currentID int
+	sessions   map[int]*Session
+	display    Display
 }
 
 func NewSessionManager(display Display) *SessionManager {
 	return &SessionManager{
-		id_counter: 0,
+		currentID: 0,
 		sessions:   make(map[int]*Session),
 		display:    display,
 	}
@@ -49,8 +48,8 @@ func NewSessionManager(display Display) *SessionManager {
 func (sm *SessionManager) incID() int {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	res := sm.id_counter
-	sm.id_counter += 1
+	res := sm.currentID
+	sm.currentID += 1
 	return res
 }
 
@@ -104,12 +103,6 @@ func (sm *SessionManager) Get(ID int) (*Session, error) {
 	}
 
 	return sesh, nil
-}
-
-func (sm *SessionManager) SetActive(ID int) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	sm.activeShellID = ID
 }
 
 func (s *Session) Start() {
@@ -175,6 +168,12 @@ func (s *Session) Background() {
 	defer s.mu.Unlock()
 	s.state = StateBackgrounded
 }
+
+func (s *Session) Write(data []byte) error {
+	_, err := s.conn.Write(data)
+	return err
+}
+
 func (s *Session) Stop() {
 	s.mu.Lock()
 	s.state = StateDead
