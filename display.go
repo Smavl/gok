@@ -64,8 +64,17 @@ func (d *TerminalDisplay) Write(b []byte) (n int, err error) {
 	return os.Stdout.Write(b)
 }
 
-func (d *TerminalDisplay ) Prompt() {
-	d.Write([]byte("GOK > "))
+func (d *TerminalDisplay) Prompt() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// Don't show GOK prompt when in raw mode (shell)
+	if d.rawMode {
+		return
+	}
+
+	// Write directly without locking (we already have the lock)
+	os.Stdout.Write([]byte("GOK > "))
 }
 func (d *TerminalDisplay) Message(msg string) {
 	d.Write([]byte(msg))

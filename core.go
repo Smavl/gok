@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"golang.org/x/term"
 )
@@ -18,19 +20,25 @@ type Core struct {
 	ShellListenerManager *ShellListenerManager
 
 	Display Display
-	Mode Mode
+	// Mode Mode
+	// for restoring
+	terminalState *term.State	
 
 	// shell
 	activeShellID int
 
-	// Event Channels
+	//input management 
+	inputReader InputReader
 	eventChan chan Event
+	stopChan chan struct{}
+
 }
 
 func NewCore(cfg Config) *Core {
+	initialState, _ := term.GetState(int(os.Stdin.Fd()))
 	terminalDisplay := NewTerminalDisplay()
 	// NOTE: Do we need a proper constructor?
-	menuMode := MenuMode{Display: terminalDisplay}
+	// menuMode := MenuMode{Display: terminalDisplay}
 	sm := NewSessionManager(terminalDisplay)
 	eventChan := make(chan Event)
 	slm := NewShellListenerManager(sm, terminalDisplay, eventChan)
@@ -41,43 +49,69 @@ func NewCore(cfg Config) *Core {
 		ShellListenerManager: slm,
 
 		Display: terminalDisplay,
-		Mode:    &menuMode,
+		// Mode:    &menuMode,
 
 		// channels
 		eventChan: eventChan,
+		inputReader: NewLineReader(),
+		terminalState: initialState,	
 	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		term.Restore(int(os.Stdin.Fd()), core.terminalState)
+		os.Exit(0)
+	}()
+
+
 	core.ShellListenerManager.Init(cfg)
 	return &core
 }
 
-func (c *Core) EnableShellMode() {
-	session, _ := c.SessionManager.Get(c.activeShellID)
-	// TODO: error handling
+func (c *Core) swapReader(newReader InputReader) {
+	// Stop the old goroutine
+	c.inputReader.Stop()
+	close(c.stopChan)
 
-	// Stop the menu reader goroutine so it releases stdin
-	c.mu.Lock()
-	if c.menuReaderCancel != nil {
-		c.menuReaderCancel()
-		c.menuReaderCancel = nil
-	}
-	c.mu.Unlock()
+	// Swap to new reader
+	c.inputReader = newReader
 
-	// Bring session to foreground (redirect buffer output to "stdout")
-	session.Foreground()
-	oldMenuMode := c.Mode
-	c.Mode = &ShellMode{Display: c.Display}
-
-	// drop into shell (blocking)
-	c.runShellReader()
-
-	// When session is escaped: background the session
-	session.Background()
-	c.Mode = oldMenuMode
-
-	// Restart the menu reader goroutine now that we're back in menu mode
-	c.startMenuReader()
+	// Start new goroutine
+	c.startInputReader()
 }
 
+func (c *Core) EnterShell(id int) {
+	c.activeShellID = id
+	session, _ := c.SessionManager.Get(id)
+
+	// raw mode
+	term.MakeRaw(int(os.Stdin.Fd()))
+	if td, ok := c.Display.(*TerminalDisplay); ok {
+		td.SetRawMode(true)
+	}
+
+	session.Foreground()
+
+	// Swap to byte reader (shell reader)
+	c.swapReader(NewByteReader())
+}
+
+func (c *Core) ExitShell() {
+	session, _ := c.SessionManager.Get(c.activeShellID)
+	session.Background()
+
+	term.Restore(int(os.Stdin.Fd()), c.terminalState)
+	if td, ok := c.Display.(*TerminalDisplay); ok {
+		td.SetRawMode(false)
+	}
+
+	c.Message("\r\n")
+
+	// Swap back to line reader (non-blocking!)
+	c.swapReader(NewLineReader())
+}
 
 
 func (c *Core) Prompt() {
@@ -90,110 +124,42 @@ func (c *Core) Message(format string, a ...any) {
 }
 
 
-// read handlers
 
-// Menu reader, reads byte-by-byte but is line-buffered
-func (c *Core) runMenuReader(ctx context.Context) {
-	// This reader is cancellable. 
-	var lineBuffer []byte
-	buf := make([]byte, 1)
+func (c *Core) startInputReader() {
+	c.stopChan = make(chan struct{})
 
-	c.Prompt()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			n, err := os.Stdin.Read(buf)
-			if err != nil || n == 0 {
-				// NOTE: This will cause the reader to exit if stdin is closed.
-				return
-			}
-			
-			// Simple line assembly
-			if buf[0] == '\n' {
-				c.eventChan <- UserInputEvent{io: string(lineBuffer)}
-				lineBuffer = []byte{}
-			} else if buf[0] != '\r' { // Ignore carriage returns
-				lineBuffer = append(lineBuffer, buf[0])
+	go func() {
+		for {
+			select {
+			case <-c.stopChan:
+				return  // Exit goroutine cleanly
+			default:
+				event := c.inputReader.Read()
+				if event != nil {
+					select {
+					case c.eventChan <- event:
+					case <-c.stopChan:
+						return
+					}
+				}
 			}
 		}
-	}
-}
-
-// Shell reader (raw terminal):
-func (c *Core) runShellReader() {
-	session, _ := c.SessionManager.Get(c.activeShellID)
-	// TODO: error handling
-
-	fd := int(os.Stdin.Fd())
-	oldState, err := term.MakeRaw(fd)
-	if err != nil {
-		c.Message("Failed to enter raw mode %v\n", err)
-		return
-	}
-	defer term.Restore(fd, oldState)
-
-	// Enable raw mode output conversion
-	if td, ok := c.Display.(*TerminalDisplay); ok {
-		td.SetRawMode(true)
-		defer td.SetRawMode(false)
-	}
-
-	// workaround for resuming session
-	session.Write([]byte("\n"))
-
-	// Read byte-by-byte in raw mode
-	buf := make([]byte, 1)
-	for {
-		n, err := os.Stdin.Read(buf)
-		if err != nil {
-			return
-		}
-		if n > 0 {
-			// Check for escape (Ctrl+D = 0x04)
-			if buf[0] == 0x04 {
-				c.Message("\r\n")
-				return
-			}
-
-			// Convert CR to LF for Unix shells
-			// FIX: HMMM without this the overal shell doesnt wrap properly (even when exiting???)
-			if buf[0] == '\r' {
-				buf[0] = '\n'
-			}
-
-			// Forward to remote shell
-			session.Write(buf[:n])
-		}
-	}
-}
-
-func (c *Core) handleEvent(e Event) {
-	switch evt := e.(type) {
-	case NewSessionEvent:
-		c.Mode.OnNewSession(evt.Session)
-	case UserInputEvent:
-		c.Mode.HandleInput(evt.io, c)
-	}
-}
-
-func (c *Core) startMenuReader() {
-	c.mu.Lock()
-	// Create a new context and cancel function for the reader
-	ctx, cancel := context.WithCancel(context.Background())
-	c.menuReaderCancel = cancel
-	go c.runMenuReader(ctx)
-	c.mu.Unlock()
+	}()
 }
 
 func (c *Core) Start() {
-	// Start the first instance of the menu reader
-	c.startMenuReader()
+	// Show initial prompt
+	c.Prompt()
 
-	// Process events from the single channel
-	for e := range c.eventChan {
-		c.handleEvent(e)
+	// Start inputReader
+	c.startInputReader()
+
+	// event loop
+	for {
+		select {
+		case event := <- c.eventChan:
+			event.Handle(c)
+		// does the above handle NewSessionEvent?
+		}
 	}
 }
