@@ -11,7 +11,13 @@ type Event interface {
 	Handle(c *Core)
 }
 
-//# Events
+//# Control Characters
+
+const (
+	CtrlD = 0x04  // Exit shell
+	CtrlC = 0x03  // Interrupt
+	CtrlL = 0x0C  // Clear screen
+)
 
 // Triggered when a shell lands
 type NewSessionEvent struct {
@@ -35,7 +41,7 @@ func (e ShellByteEvent) Handle(c *Core) {
 	// WARN: Should be buffer instead?
 
 	// ctrl+d
-	if e.Byte == 0x04 {
+	if e.Byte == CtrlD {
 		c.ExitShell()
 		return
 	}
@@ -47,13 +53,17 @@ func (e ShellByteEvent) Handle(c *Core) {
 	}
 
 	// Forward to remote shell
-	session, _ := c.SessionManager.Get(c.activeShellID)
+	session, err := c.SessionManager.Get(c.GetActiveShell())
+	if err != nil {
+		// Session died while we were in it
+		c.ExitShell()
+		return
+	}
 	session.Write([]byte{e.Byte})
 
 }
 
 func (e MenuCmdEvent) Handle(c *Core) {
-	// c.Prompt()
 	// split on all whitespace
 	args := strings.Fields(e.input)
 
@@ -104,7 +114,7 @@ func (e MenuCmdEvent) Handle(c *Core) {
 			sessionExists := c.SessionManager.Exists(id)
 
 			if sessionExists {
-				c.activeShellID = id
+				// activeShellID will be set by EnterShell()
 				c.Message("[*] Session #%v: Dropping into shell..\n", id)
 				c.EnterShell(id)
 				// No prompt - we're in shell mode now!

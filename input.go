@@ -61,5 +61,5 @@ func (r *LineReader) Stop() {
 	// Nothing needed for line reader
 }
 func (r *ByteReader) Stop() {
-	// Nothing needed for line reader
+	// Nothing needed for byte reader
 }

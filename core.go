@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,20 +13,19 @@ import (
 type Core struct {
 	mu               sync.RWMutex
 	Config           Config
-	menuReaderCancel context.CancelFunc
 
 	SessionManager       *SessionManager
 	ShellListenerManager *ShellListenerManager
 
 	Display Display
-	// Mode Mode
+
 	// for restoring
-	terminalState *term.State	
+	terminalState *term.State
 
 	// shell
 	activeShellID int
 
-	//input management 
+	//input management
 	inputReader InputReader
 	eventChan chan Event
 	stopChan chan struct{}
@@ -35,10 +33,12 @@ type Core struct {
 }
 
 func NewCore(cfg Config) *Core {
-	initialState, _ := term.GetState(int(os.Stdin.Fd()))
+	initialState, err := term.GetState(int(os.Stdin.Fd()))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[!] Fatal: Could not get terminal state: %v\n", err)
+		os.Exit(1)
+	}
 	terminalDisplay := NewTerminalDisplay()
-	// NOTE: Do we need a proper constructor?
-	// menuMode := MenuMode{Display: terminalDisplay}
 	sm := NewSessionManager(terminalDisplay)
 	eventChan := make(chan Event)
 	slm := NewShellListenerManager(sm, terminalDisplay, eventChan)
@@ -54,7 +54,7 @@ func NewCore(cfg Config) *Core {
 		// channels
 		eventChan: eventChan,
 		inputReader: NewLineReader(),
-		terminalState: initialState,	
+		terminalState: initialState,
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -83,8 +83,14 @@ func (c *Core) swapReader(newReader InputReader) {
 }
 
 func (c *Core) EnterShell(id int) {
-	c.activeShellID = id
-	session, _ := c.SessionManager.Get(id)
+	session, err := c.SessionManager.Get(id)
+	if err != nil {
+		c.Message("[!] Error: Session #%d not found\n", id)
+		c.Prompt()
+		return
+	}
+
+	c.SetActiveShell(id)
 
 	// raw mode
 	term.MakeRaw(int(os.Stdin.Fd()))
@@ -99,8 +105,13 @@ func (c *Core) EnterShell(id int) {
 }
 
 func (c *Core) ExitShell() {
-	session, _ := c.SessionManager.Get(c.activeShellID)
-	session.Background()
+	session, err := c.SessionManager.Get(c.GetActiveShell())
+	if err != nil {
+		// Session might have died - still restore terminal
+		c.Message("\r\n[!] Warning: Session no longer exists\r\n")
+	} else {
+		session.Background()
+	}
 
 	term.Restore(int(os.Stdin.Fd()), c.terminalState)
 	if td, ok := c.Display.(*TerminalDisplay); ok {
@@ -111,6 +122,7 @@ func (c *Core) ExitShell() {
 
 	// Swap back to line reader (non-blocking!)
 	c.swapReader(NewLineReader())
+	defer c.Prompt()
 }
 
 
@@ -123,7 +135,18 @@ func (c *Core) Message(format string, a ...any) {
 	c.Display.Message(msg)
 }
 
+// Thread-safe accessors for activeShellID
+func (c *Core) SetActiveShell(id int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.activeShellID = id
+}
 
+func (c *Core) GetActiveShell() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.activeShellID
+}
 
 func (c *Core) startInputReader() {
 	c.stopChan = make(chan struct{})
