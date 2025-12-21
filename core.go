@@ -17,11 +17,17 @@ type Core struct {
 	SessionManager       *SessionManager
 	ShellListenerManager *ShellListenerManager
 	InputMan             *InputManagerImpl
-	commander            CommandHandler
+
+	// Handlers
+	commander            *CommandHandler
 	shellMode            *RawShellMode
 	terminal             *Terminal
 
+	// event
 	eventChan chan Event
+	ctx context.Context
+	cancel context.CancelFunc
+	wg sync.WaitGroup
 }
 
 func NewCore(cfg Config) *Core {
@@ -46,15 +52,14 @@ func NewCore(cfg Config) *Core {
 		eventChan:            eventChan,
 		InputMan:             inputMan,
 		shellMode:            shellMode,
-		commander:            *NewCommandHandler(sm, slm, terminal, shellMode),
+		commander:            NewCommandHandler(sm, slm, terminal, shellMode),
 	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		core.terminal.Restore()
-		os.Exit(0)
+		core.Shutdown()
 	}()
 
 	core.ShellListenerManager.Init(context.Background(), cfg)
@@ -70,18 +75,43 @@ func (c *Core) Message(format string, a ...any) {
 }
 
 func (c *Core) Start() {
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+
 	// Show initial prompt
 	c.Prompt()
 
 	// Start inputReader
-	c.InputMan.Start(context.Background())
+	c.InputMan.Start(c.ctx)
 
 	// event loop
 	for {
 		select {
 		case event := <-c.eventChan:
 			event.Handle(c)
-			// does the above handle NewSessionEvent?
+		case <-c.ctx.Done():
+			return
 		}
 	}
+}
+
+func (c *Core) Shutdown() {
+	c.terminal.Message("\n[*] Shutting down gracefully...\n")
+
+	// Cancel all contexts
+	if c.cancel != nil {
+		c.cancel()
+	}
+
+	// Stop input manager
+	c.InputMan.Stop()
+
+	// Stop all sessions
+	for _, sess := range c.SessionManager.GetSessions() {
+		sess.Stop()
+	}
+
+	// Note: Listeners will stop when their contexts are cancelled
+
+	c.terminal.Restore()
+	os.Exit(0)
 }

@@ -4,8 +4,20 @@ import (
 	"fmt"
 )
 
+type EventHandler interface {
+	Sessions()	*SessionManager
+	ShellMode() *RawShellMode
+	Terminal()	*Terminal
+	Commander() *CommandHandler
+}
+
+func (c *Core) Sessions() *SessionManager { return c.SessionManager }
+func (c *Core) ShellMode() *RawShellMode { return c.shellMode }
+func (c *Core) Terminal() *Terminal { return c.terminal }
+func (c *Core) Commander() *CommandHandler { return c.commander}
+
 type Event interface {
-	Handle(c *Core)
+	Handle(h EventHandler)
 }
 
 //# Control Characters
@@ -29,15 +41,15 @@ type MenuCmdEvent struct {
 	Input string 
 }
 
-func (e NewSessionEvent) Handle(c *Core) {
-	c.Message("%s", fmt.Sprintf("\n[+] New session #%d from %s\n", e.Session.ID, e.Session.Addr))
-	c.Prompt()
+func (e NewSessionEvent) Handle(h EventHandler) {
+	h.Terminal().Message("%s", fmt.Sprintf("\n[+] New session #%d from %s\n", e.Session.ID, e.Session.Addr))
+	h.Terminal().Prompt()
 }
 
-func (e ShellByteEvent) Handle(c *Core) {
+func (e ShellByteEvent) Handle(h EventHandler) {
 	// WARN: Should be buffer instead?
 	if e.Byte == CtrlD {
-		c.shellMode.Exit()
+		h.ShellMode().Exit()
 		return
 	}
 
@@ -48,16 +60,16 @@ func (e ShellByteEvent) Handle(c *Core) {
 	}
 
 	// Forward to remote shell
-	session, err := c.SessionManager.Get(c.shellMode.GetActiveSessionId())
+	session, err := h.Sessions().Get(h.ShellMode().GetActiveSessionId())
 	if err != nil {
 		// Session died while we were in it
-		c.shellMode.Exit()
+		h.ShellMode().Exit()
 		return
 	}
 	session.Write([]byte{e.Byte})
 
 }
 
-func (e MenuCmdEvent) Handle(c *Core) {
-	c.commander.Execute(e.Input)
+func (e MenuCmdEvent) Handle(h EventHandler) {
+	h.Commander().Execute(e.Input)
 }
