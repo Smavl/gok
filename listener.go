@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 type Listener struct {
 	address  string
 	port     int
 	listener net.Listener
+	ctx      context.Context
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 type ListenerManager interface {
@@ -22,45 +27,42 @@ type ListenerManager interface {
 type ShellListenerManager struct {
 	mu             sync.RWMutex
 	listeners      map[string]*Listener
-	display        Display
+	terminal       *Terminal
 	sessionManager *SessionManager
-	eventChan      chan<- Event // Write-only channel for decoupling
+	eventChan      chan<- Event
 }
 
-// NewShellListenerManager creates a new listener manager.
-// It requires its dependencies to be injected upon creation.
-func NewShellListenerManager(sm *SessionManager, display Display, eventChan chan<- Event) *ShellListenerManager {
+func NewShellListenerManager(sm *SessionManager, terminal *Terminal, eventChan chan<- Event) *ShellListenerManager {
 	return &ShellListenerManager{
 		listeners:      make(map[string]*Listener),
 		sessionManager: sm,
-		display:        display,
+		terminal:       terminal,
 		eventChan:      eventChan,
 	}
 }
 
-func (lm *ShellListenerManager) Init(config Config) {
-	lm.display.Message("[+] Initializing listeners:\n\t")
+func (lm *ShellListenerManager) Init(ctx context.Context, config Config) {
+	lm.terminal.Message("[+] Initializing listeners:\n\t")
 
 	for _, addr := range config.bindIps {
 		for _, port := range config.PortRange.Ports {
-			lm.display.Message(fmt.Sprintf("%s:%d ", addr, port))
+			lm.terminal.Message("%s:%d ", addr, port)
 
-			l, err := lm.Start(addr, port)
+			l, err := lm.Start(ctx, addr, port)
 			if err != nil {
 				log.Printf("[-] Failed to start listener on %s:%d: %v", addr, port, err)
 				continue
 			}
 			lm.mu.Lock()
-			// The key for the map is the address string.
+
 			id := fmt.Sprintf("%s:%d", l.address, l.port)
 			lm.listeners[id] = l
 			lm.mu.Unlock()
 		}
 	}
-	lm.display.Message("\n[*] Waiting for connections...\n")
+	lm.terminal.Message("\n[*] Waiting for connections...\n")
 }
 
-// GetAddresses returns a slice of strings representing the addresses of active listeners.
 func (lm *ShellListenerManager) GetAddresses() []string {
 	lm.mu.RLock()
 	defer lm.mu.RUnlock()
@@ -71,35 +73,63 @@ func (lm *ShellListenerManager) GetAddresses() []string {
 	return addrs
 }
 
-
-func (lm *ShellListenerManager) Start(addr string, port int) (*Listener, error) {
+func (lm *ShellListenerManager) Start(ctx context.Context, addr string, port int) (*Listener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start listener: %w", err)
 	}
 
+	listenerCtx, cancel := context.WithCancel(ctx)
+
 	l := &Listener{
 		address:  addr,
 		port:     port,
 		listener: listener,
+		ctx:      listenerCtx,
+		cancel:   cancel,
 	}
 
-	go func() {
-		defer listener.Close()
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("[-] Error accepting connection: %v", err)
-				return // Exit goroutine when listener is closed
-			}
+	l.wg.Add(1)
 
-			// create session using the injected session manager
-			session := lm.sessionManager.AddSession(conn)
-
-			// announce to channel using the injected channel
-			lm.eventChan <- NewSessionEvent{Session: session}
-		}
-	}()
+	go l.acceptLoop(lm.sessionManager, lm.terminal, lm.eventChan)
 
 	return l, nil
+}
+func (l *Listener) acceptLoop(sm *SessionManager, terminal *Terminal, eventChan chan<- Event) {
+	defer l.wg.Done()
+	defer l.listener.Close()
+
+	for {
+		select {
+		case <-l.ctx.Done():
+			return
+		default:
+			// Set deadline; make Accept cancellable
+			l.listener.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second))
+
+			conn, err := l.listener.Accept()
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue // Check context again
+				}
+				log.Printf("[-] Error accepting connection: %v", err)
+				return
+			}
+
+			session, err := sm.AddSession(conn, terminal)
+			if err != nil {
+				log.Printf("Failed to add session: %v", err)
+				continue
+			}
+
+			eventChan <- NewSessionEvent{Session: session}
+		}
+	}
+}
+
+func (l *Listener) Stop() {
+	if l.cancel != nil {
+		l.cancel()
+	}
+	l.wg.Wait()
 }
