@@ -72,25 +72,25 @@ func (ch *CommandHandler) interact(args []string) {
 }
 
 func (ch *CommandHandler) killSession(args []string) {
-    if len(args) != 2 {
-        ch.terminal.Message("[!] Usage: kill <session_id>\n")
-        return
-    }
-    
-    id, err := strconv.Atoi(args[1])
-    if err != nil {
-        ch.terminal.Message("[!] Invalid session ID: %v\n", args[1])
-        return
-    }
-    
-    session, err := ch.sessions.Get(id)
-    if err != nil {
-        ch.terminal.Message("[!] Session #%d not found\n", id)
-        return
-    }
-    
-    session.Stop()
-    ch.terminal.Message("[*] Killed session #%d\n", id)
+	if len(args) != 2 {
+		ch.terminal.Message("[!] Usage: kill <session_id>\n")
+		return
+	}
+
+	id, err := strconv.Atoi(args[1])
+	if err != nil {
+		ch.terminal.Message("[!] Invalid session ID: %v\n", args[1])
+		return
+	}
+
+	session, err := ch.sessions.Get(id)
+	if err != nil {
+		ch.terminal.Message("[!] Session #%d not found\n", id)
+		return
+	}
+
+	session.Stop()
+	ch.terminal.Message("[*] Killed session #%d\n", id)
 }
 
 func (ch *CommandHandler) showHelp() {

@@ -44,6 +44,7 @@ func (m *RawShellMode) Enter(ID int) {
 	m.terminal.SetRaw()
 	session.Foreground()
 	m.im.SwapReader(NewByteReader())
+	session.Write([]byte{'\n'})
 }
 func (m *RawShellMode) GetActiveSessionId() int {
 	return m.activeShellID
@@ -59,9 +60,7 @@ func (m *RawShellMode) Exit() {
 	}
 
 	m.terminal.Restore()
-
-	m.terminal.Message("\r\n")
-	m.terminal.Message("[*] Returning to main menu\n")
+	m.terminal.Message("\n[*] Returning to main menu\n")
 
 	// Swap back to line reader
 	m.im.SwapReader(NewLineReader())

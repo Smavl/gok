@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -68,20 +67,20 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 }
 
 type Session struct {
-	ID   int
-	conn net.Conn
-	Addr string
+	ID			 int
+	conn 		 net.Conn
+	Addr 		 string
 
 	mu           sync.Mutex
 	state        SessionState
-	outputBuffer bytes.Buffer
+	// outputBuffer bytes.Buffer
 	display      io.Writer
 	history      *HistoryLineBuffer
 
 	// context things
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ctx			 context.Context
+	cancel 		 context.CancelFunc
+	wg     		 sync.WaitGroup
 }
 
 type SessionManager struct {
@@ -220,9 +219,9 @@ func (s *Session) outputLoop() {
 			case StateActive:
 				s.display.Write(data)
 				// Buffer to background
-			case StateBackgrounded:
-				s.outputBuffer.Write(data)
-				// ???
+			// case StateBackgrounded:
+			// 	s.outputBuffer.Write(data)
+			//
 			case StateDead:
 				s.mu.Unlock()
 				return
@@ -232,37 +231,52 @@ func (s *Session) outputLoop() {
 	}
 }
 
+// Write sends data to the remote session; returns error if the session is dead.
+func (s *Session) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state == StateDead {
+		return 0, ErrSessionDed
+	}
+	return s.conn.Write(p)
+}
+
 func (s *Session) Foreground() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state = StateActive
 
-	// drain buffer when forgrounding
-	if s.outputBuffer.Len() > 0 {
-		s.display.Write(s.outputBuffer.Bytes())
-		s.outputBuffer.Reset()
+	if len(s.history.lines) > 0 {
+		s.display.Write([]byte(string("[*] Resuming session...\n")))
+	}
+
+	for _, l := range s.history.lines {
+		s.display.Write([]byte(l))
 	}
 }
 
 func (s *Session) Background() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.state = StateBackgrounded
-}
-
-func (s *Session) Write(data []byte) error {
-	_, err := s.conn.Write(data)
-	return err
+	// Only mark as backgrounded; do not stop the session or close the connection
+	if s.state != StateDead {
+		s.state = StateBackgrounded
+	}
 }
 
 func (s *Session) Stop() {
-	s.mu.Lock()
-	s.state = StateDead
-	if s.cancel != nil {
-		s.cancel()
-	}
-	s.mu.Unlock()
+    s.mu.Lock()
+    if s.state == StateDead {
+        s.mu.Unlock()
+        return
+    }
+    s.state = StateDead
+    if s.cancel != nil {
+        s.cancel()
+    }
+    s.mu.Unlock()
 
-	s.wg.Wait()
-	s.conn.Close()
+    s.wg.Wait()
+    s.conn.Close()
 }
+

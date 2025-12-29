@@ -76,11 +76,9 @@ func (c *Core) Message(format string, a ...any) {
 
 func (c *Core) Start() {
 	c.ctx, c.cancel = context.WithCancel(context.Background())
-
 	// Show initial prompt
 	c.Prompt()
 
-	// Start inputReader
 	c.InputMan.Start(c.ctx)
 
 	// event loop
@@ -102,15 +100,11 @@ func (c *Core) Shutdown() {
 		c.cancel()
 	}
 
-	// Stop input manager
 	c.InputMan.Stop()
 
-	// Stop all sessions
 	for _, sess := range c.SessionManager.GetSessions() {
 		sess.Stop()
 	}
-
-	// Note: Listeners will stop when their contexts are cancelled
 
 	c.terminal.Restore()
 	os.Exit(0)
