@@ -17,6 +17,7 @@ const (
 	StateActive SessionState = iota
 	StateBackgrounded
 	StateDead
+	StateProbing
 	// StateIdle
 )
 
@@ -66,21 +67,29 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 	}
 }
 
+type SystemInfo struct {
+	OS	OS
+}
+
 type Session struct {
-	ID			 int
-	conn 		 net.Conn
-	Addr 		 string
+	ID					int
+	conn 		 		net.Conn
+	Addr 		 		string
 
-	mu           sync.Mutex
-	state        SessionState
-	// outputBuffer bytes.Buffer
-	display      io.Writer
-	history      *HistoryLineBuffer
+	mu           		sync.Mutex
+	state        		SessionState
+	display		 		io.Writer
+	history      		*HistoryLineBuffer
 
+	// probing
+	probingBuffer		*HistoryLineBuffer
+	probinDataArrived	chan struct{}
+
+	SystemInfo			SystemInfo
 	// context things
-	ctx			 context.Context
-	cancel 		 context.CancelFunc
-	wg     		 sync.WaitGroup
+	ctx					context.Context
+	cancel 		 		context.CancelFunc
+	wg     		 		sync.WaitGroup
 }
 
 type SessionManager struct {
@@ -106,11 +115,14 @@ func (sm *SessionManager) incID() int {
 
 func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session, error) {
 	session := Session{
-		ID:      sm.incID(),
-		conn:    conn,
-		Addr:    conn.RemoteAddr().String(),
-		display: display,
-		history: CreateLineBuffer(defaultHistoryMaxLines),
+		ID:					sm.incID(),
+		conn:    			conn,
+		Addr:    			conn.RemoteAddr().String(),
+		display: 			display,
+		history: 			CreateLineBuffer(defaultHistoryMaxLines),
+		probingBuffer:		CreateLineBuffer(defaultHistoryMaxLines),
+		probinDataArrived:	make(chan struct{}),
+		SystemInfo: SystemInfo{},
 	}
 
 	sm.mu.Lock()
@@ -153,13 +165,13 @@ func (sm *SessionManager) Get(ID int) (*Session, error) {
 	defer sm.mu.RUnlock()
 	sesh, ok := sm.sessions[ID]
 	if !ok {
-		// TODO: Add better message
 		return nil, ErrSessionNotFound
 	}
 
 	return sesh, nil
 }
 
+// At this point the shell has landed
 func (s *Session) Start(ctx context.Context) error {
 	s.mu.Lock()
 	s.state = StateBackgrounded
@@ -168,8 +180,44 @@ func (s *Session) Start(ctx context.Context) error {
 
 	s.wg.Add(1)
 	go s.outputLoop()
+
+	// NOTE: probing session has to happend after outputLoop is initialized
+	s.probeSession()
 	return nil
 }
+
+func (s *Session) probeSession() error {
+	// get os 
+	rcmds := RandomCommandStrategy{}	
+	OS, err := rcmds.DetermineOS(s)
+	if err != nil {
+		return err
+	}
+	s.SystemInfo.OS = OS
+	// TEST: print for debug
+	s.display.Write([]byte(fmt.Sprintf("Detected OS: %v\n", s.SystemInfo.OS)))
+
+
+	// Fetch binaries
+	//  binaries
+
+	return nil
+}
+
+func (s *Session) GetProbingLines() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.probingBuffer.lines
+}
+
+func (s *Session) ClearProbingBuffer() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// slices are well behaved so nil should be fine
+	s.probingBuffer.lines = nil
+	s.probingBuffer.partialBuf = ""
+}
+
 
 func (s *Session) outputLoop() {
 	defer s.wg.Done()
@@ -211,17 +259,23 @@ func (s *Session) outputLoop() {
 
 		if n > 0 {
 			data := buf[:n]
-			s.history.Feed(data)
 
 			s.mu.Lock()
 			switch s.state {
 			// forward to the display
 			case StateActive:
+				s.history.Feed(data)
 				s.display.Write(data)
-				// Buffer to background
+			// Buffer to background
 			// case StateBackgrounded:
-			// 	s.outputBuffer.Write(data)
 			//
+			case StateProbing:
+				s.probingBuffer.Feed(data)
+				// signal that probing data is incomming
+				select {
+				case s.probinDataArrived <- struct{}{}:
+				default:
+				}
 			case StateDead:
 				s.mu.Unlock()
 				return
@@ -231,7 +285,9 @@ func (s *Session) outputLoop() {
 	}
 }
 
-// Write sends data to the remote session; returns error if the session is dead.
+
+
+// send data to the remote session
 func (s *Session) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -241,6 +297,7 @@ func (s *Session) Write(p []byte) (int, error) {
 	return s.conn.Write(p)
 }
 
+// foregound the session to the user
 func (s *Session) Foreground() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -258,25 +315,24 @@ func (s *Session) Foreground() {
 func (s *Session) Background() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// Only mark as backgrounded; do not stop the session or close the connection
 	if s.state != StateDead {
 		s.state = StateBackgrounded
 	}
 }
 
 func (s *Session) Stop() {
-    s.mu.Lock()
-    if s.state == StateDead {
-        s.mu.Unlock()
-        return
-    }
-    s.state = StateDead
-    if s.cancel != nil {
-        s.cancel()
-    }
-    s.mu.Unlock()
+	s.mu.Lock()
+	if s.state == StateDead {
+		s.mu.Unlock()
+		return
+	}
+	s.state = StateDead
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.mu.Unlock()
 
-    s.wg.Wait()
-    s.conn.Close()
+	s.wg.Wait()
+	s.conn.Close()
 }
 
