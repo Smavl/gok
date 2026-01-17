@@ -19,15 +19,15 @@ type Core struct {
 	InputMan             *InputManagerImpl
 
 	// Handlers
-	commander            *CommandHandler
-	shellMode            *RawShellMode
-	terminal             *Terminal
+	commander *CommandHandler
+	shellMode *RawShellMode
+	terminal  *Terminal
 
 	// event
 	eventChan chan Event
-	ctx context.Context
-	cancel context.CancelFunc
-	wg sync.WaitGroup
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
 }
 
 func NewCore(cfg Config) *Core {

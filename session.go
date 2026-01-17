@@ -68,28 +68,28 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 }
 
 type SystemInfo struct {
-	OS	OS
+	OS OS
 }
 
 type Session struct {
-	ID					int
-	conn 		 		net.Conn
-	Addr 		 		string
+	ID   int
+	conn net.Conn
+	Addr string
 
-	mu           		sync.Mutex
-	state        		SessionState
-	display		 		io.Writer
-	history      		*HistoryLineBuffer
+	mu      sync.Mutex
+	state   SessionState
+	display io.Writer
+	history *HistoryLineBuffer
 
 	// probing
-	probingBuffer		*HistoryLineBuffer
-	probinDataArrived	chan struct{}
+	probingBuffer     *HistoryLineBuffer
+	probinDataArrived chan struct{}
 
-	SystemInfo			SystemInfo
+	SystemInfo SystemInfo
 	// context things
-	ctx					context.Context
-	cancel 		 		context.CancelFunc
-	wg     		 		sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 type SessionManager struct {
@@ -115,14 +115,14 @@ func (sm *SessionManager) incID() int {
 
 func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session, error) {
 	session := Session{
-		ID:					sm.incID(),
-		conn:    			conn,
-		Addr:    			conn.RemoteAddr().String(),
-		display: 			display,
-		history: 			CreateLineBuffer(defaultHistoryMaxLines),
-		probingBuffer:		CreateLineBuffer(defaultHistoryMaxLines),
-		probinDataArrived:	make(chan struct{}),
-		SystemInfo: SystemInfo{},
+		ID:                sm.incID(),
+		conn:              conn,
+		Addr:              conn.RemoteAddr().String(),
+		display:           display,
+		history:           CreateLineBuffer(defaultHistoryMaxLines),
+		probingBuffer:     CreateLineBuffer(defaultHistoryMaxLines),
+		probinDataArrived: make(chan struct{}),
+		SystemInfo:        SystemInfo{},
 	}
 
 	sm.mu.Lock()
@@ -136,7 +136,7 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 	return &session, nil
 }
 
-func (sm *SessionManager) GetAmount() int {
+func (sm *SessionManager) GetAmountOfSessions() int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	return len(sm.sessions)
@@ -181,25 +181,31 @@ func (s *Session) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.outputLoop()
 
-	// NOTE: probing session has to happend after outputLoop is initialized
+	// NOTE: probing session has to happen after outputLoop is initialized
 	s.probeSession()
 	return nil
 }
 
 func (s *Session) probeSession() error {
-	// get os 
-	rcmds := RandomCommandStrategy{}	
+	s.mu.Lock()
+	s.state = StateProbing
+	s.mu.Unlock()
+	// get os
+	rcmds := RandomCommandStrategy{}
 	OS, err := rcmds.DetermineOS(s)
 	if err != nil {
 		return err
 	}
 	s.SystemInfo.OS = OS
 	// TEST: print for debug
-	s.display.Write([]byte(fmt.Sprintf("Detected OS: %v\n", s.SystemInfo.OS)))
-
+	// s.display.Write([]byte(fmt.Sprintf("Detected OS: %v\n", s.SystemInfo.OS)))
 
 	// Fetch binaries
 	//  binaries
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state = StateBackgrounded
 
 	return nil
 }
@@ -217,7 +223,6 @@ func (s *Session) ClearProbingBuffer() {
 	s.probingBuffer.lines = nil
 	s.probingBuffer.partialBuf = ""
 }
-
 
 func (s *Session) outputLoop() {
 	defer s.wg.Done()
@@ -285,8 +290,6 @@ func (s *Session) outputLoop() {
 	}
 }
 
-
-
 // send data to the remote session
 func (s *Session) Write(p []byte) (int, error) {
 	s.mu.Lock()
@@ -335,4 +338,3 @@ func (s *Session) Stop() {
 	s.wg.Wait()
 	s.conn.Close()
 }
-

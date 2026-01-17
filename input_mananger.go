@@ -6,12 +6,12 @@ import (
 )
 
 type InputManagerImpl struct {
-	mu	sync.Mutex
-	ctx	context.Context
-	cancel	context.CancelFunc
-	reader 	InputReader
-	eventCh chan<-Event
-	wg	sync.WaitGroup
+	mu      sync.Mutex
+	ctx     context.Context
+	cancel  context.CancelFunc
+	reader  InputReader
+	eventCh chan<- Event
+	wg      sync.WaitGroup
 }
 
 type InputManager interface {
@@ -21,15 +21,14 @@ type InputManager interface {
 	SwapReader(reader InputReader)
 }
 
-func NewInputManager(initialInputRead InputReader, evenCh chan<- Event) *InputManagerImpl  {
+func NewInputManager(initialInputRead InputReader, evenCh chan<- Event) *InputManagerImpl {
 	return &InputManagerImpl{
-		reader: initialInputRead,
+		reader:  initialInputRead,
 		eventCh: evenCh,
 	}
 }
 
-
-func (im *InputManagerImpl) Start(ctx context.Context)  {
+func (im *InputManagerImpl) Start(ctx context.Context) {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 
@@ -39,7 +38,7 @@ func (im *InputManagerImpl) Start(ctx context.Context)  {
 	go im.run()
 }
 
-func (im *InputManagerImpl) Stop()  {
+func (im *InputManagerImpl) Stop() {
 	im.mu.Lock()
 
 	if im.cancel != nil {
@@ -52,7 +51,7 @@ func (im *InputManagerImpl) Stop()  {
 	im.wg.Wait()
 }
 
-func (im *InputManagerImpl) run()  {
+func (im *InputManagerImpl) run() {
 	// signal to WaitGroup when done
 	defer im.wg.Done()
 	for {
@@ -63,10 +62,10 @@ func (im *InputManagerImpl) run()  {
 		default:
 			// Read event from InputReader (producer?)
 			event := im.reader.Read()
-			// in case of event 
+			// in case of event
 			if event != nil {
 				select {
-				// send event to 
+				// send event to
 				case im.eventCh <- event:
 				// Check also for Done signal inside event?
 				case <-im.ctx.Done():

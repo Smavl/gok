@@ -22,6 +22,16 @@ type PortRange struct {
 	Ports []int
 }
 
+func isValidPort(port int) bool {
+	minValidPort := 1
+	maxValidPort := 65535
+
+	if port < minValidPort {return false}
+	if port > maxValidPort {return false}
+
+	return true
+}
+
 // Custom parsing
 // TODO: Add support for muliple
 func (p *PortRange) Decode(ctx *kong.DecodeContext) error {
@@ -57,11 +67,18 @@ func (p *PortRange) Decode(ctx *kong.DecodeContext) error {
 		p.Ports = make([]int, count)
 
 		for i := range p.Ports {
-			p.Ports[i] = start + i
+			currentPort := start + i
+			if !isValidPort(currentPort) {
+				return fmt.Errorf("Invalid port in range: %d", currentPort)
+			}
+			p.Ports[i] = currentPort
 		}
 	} else {
 		// single port
 		port, err := strconv.Atoi(value)
+		if !isValidPort(port) {
+			return fmt.Errorf("Invalid port in range: %d", port)
+		}
 		if err != nil {
 			return fmt.Errorf("Invalid port value: %v", err)
 		}

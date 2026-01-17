@@ -11,7 +11,7 @@ type Display interface {
 }
 
 type TerminalDisplay struct {
-	mu      sync.Mutex
+	mu sync.Mutex
 }
 
 func NewTerminalDisplay() *TerminalDisplay {
@@ -19,7 +19,7 @@ func NewTerminalDisplay() *TerminalDisplay {
 }
 
 func (d *TerminalDisplay) Write(b []byte) (int, error) {
-    d.mu.Lock()
-    defer d.mu.Unlock()
-    return os.Stdout.Write(b)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return os.Stdout.Write(b)
 }

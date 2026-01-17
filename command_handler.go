@@ -23,7 +23,7 @@ func NewCommandHandler(sessions *SessionManager, listeners *ShellListenerManager
 }
 
 func (ch *CommandHandler) listSessions() {
-	if ch.sessions.GetAmount() == 0 {
+	if ch.sessions.GetAmountOfSessions() == 0 {
 		ch.terminal.Message("\n[!] No active sessions\n")
 	} else {
 		ch.terminal.Message("\nActive Sessions:\n")
@@ -94,7 +94,15 @@ func (ch *CommandHandler) killSession(args []string) {
 }
 
 func (ch *CommandHandler) showHelp() {
-	panic("unimplemented")
+	helpText := `Available Commands:
+  listeners, lis, l         - List all active listeners
+  sessions, sesh, sess, s   - List all active sessions
+  interact, int, i <id>     - Interact with a session by its ID
+  kill, k <id>              - Kill a session by its ID
+  help, h                   - Show this help message
+  exit, quit                - Exit the application
+`
+	ch.terminal.Message("%s", helpText)
 }
 
 func (ch *CommandHandler) Execute(input string) {
@@ -129,8 +137,8 @@ func (ch *CommandHandler) Execute(input string) {
 	default:
 		// TODO: Add help suggestion
 		ch.terminal.Message("[!] Unknown command: %s\n", subCmd)
+		ch.terminal.Message(`[+] Type "help" to see available commands.`)
 	}
 
 	ch.terminal.Prompt()
 }
-

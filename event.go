@@ -1,20 +1,16 @@
 package main
 
-import (
-	"fmt"
-)
-
 type EventHandler interface {
-	Sessions()	*SessionManager
+	Sessions() *SessionManager
 	ShellMode() *RawShellMode
-	Terminal()	*Terminal
+	Terminal() *Terminal
 	Commander() *CommandHandler
 }
 
-func (c *Core) Sessions() *SessionManager { return c.SessionManager }
-func (c *Core) ShellMode() *RawShellMode { return c.shellMode }
-func (c *Core) Terminal() *Terminal { return c.terminal }
-func (c *Core) Commander() *CommandHandler { return c.commander}
+func (c *Core) Sessions() *SessionManager  { return c.SessionManager }
+func (c *Core) ShellMode() *RawShellMode   { return c.shellMode }
+func (c *Core) Terminal() *Terminal        { return c.terminal }
+func (c *Core) Commander() *CommandHandler { return c.commander }
 
 type Event interface {
 	Handle(h EventHandler)
@@ -23,9 +19,9 @@ type Event interface {
 //# Control Characters
 
 const (
-	CtrlD = 0x04  // Exit shell
-	CtrlC = 0x03  // Interrupt
-	CtrlL = 0x0C  // Clear screen
+	CtrlD = 0x04 // Exit shell
+	CtrlC = 0x03 // Interrupt
+	CtrlL = 0x0C // Clear screen
 )
 
 // Triggered when a shell lands
@@ -38,11 +34,12 @@ type ShellByteEvent struct {
 }
 
 type MenuCmdEvent struct {
-	Input string 
+	Input string
 }
 
 func (e NewSessionEvent) Handle(h EventHandler) {
-	h.Terminal().Message("%s", fmt.Sprintf("\n[+] New session #%d from %s\n", e.Session.ID, e.Session.Addr))
+	// h.Terminal().Message("%s", fmt.Sprintf("\n[+] New session #%d from %s\n", e.Session.ID, e.Session.Addr))
+	h.Terminal().Message("\n[+] %s => New session #%d | %s \n", e.Session.Addr, e.Session.ID, e.Session.SystemInfo.OS.String())
 	h.Terminal().Prompt()
 }
 

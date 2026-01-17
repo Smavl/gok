@@ -11,18 +11,18 @@ import (
 // }
 
 type RawShellMode struct {
-	mu sync.Mutex
+	mu            sync.Mutex
 	activeShellID int
 
-	sm *SessionManager
-	im *InputManagerImpl
+	sm       *SessionManager
+	im       *InputManagerImpl
 	terminal *Terminal
 }
 
 func NewRawShellMode(sessionMan *SessionManager, inputMan *InputManagerImpl, terminal *Terminal) *RawShellMode {
 	return &RawShellMode{
-		sm: sessionMan,
-		im: inputMan,
+		sm:       sessionMan,
+		im:       inputMan,
 		terminal: terminal,
 	}
 }
