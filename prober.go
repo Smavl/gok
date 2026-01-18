@@ -238,7 +238,6 @@ func (prober *LinuxProber) EnumerateBinaries() {
 		if binaryPresent {
 			session.display.Write(fmt.Appendf(nil, "Binary found: %s\n", binary))
 		}
-		
 	}
 
 }

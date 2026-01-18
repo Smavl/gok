@@ -10,29 +10,34 @@
 - [x] Add simple menu handling (Channels?)
     - [x] View Sessions, and listners
     - [x] Interact with session
-    - [ ] Kill sessions
-    - [ ] Add help menu
+    - [x] Kill sessions
+    - [x] Add help menu
 - [x] testing "Setup" 
+    - [x] Docker setup?
 - [ ] Testing
-    - [ ] Parsing of CLI flags (add option to "show flags" to unit test)
+    - [x] Parsing of CLI flags (add option to "show flags" to unit test)
     - [x] More streamlined testing setup?
-- [ ] Reflect on architechture 
-    - [ ] Refactor/simplify?
+    - [ ] 
 - [ ] Interactive shell handling
     - [x] Add escaping from session
+    - [ ] Add "meta mode"
+- [ ] Menu actions
+    - [ ] Session details (info from the prober?)
 
 
 # TODO (Long term)
 
 ## Shell 
 
-- [ ] OS detection
-    - [ ] linux
+- [x] OS detection
+    - [x] linux
     - [ ] windows
 - [ ] Session handling
-    - [ ] print history after entering session again
+    - [x] print history after entering session again
 - [ ] Prober
-    - [ ] Find binaries
+    - [x] Detect `which` binary
+    - [x] Find binaries
+    - [ ] EnumerateUser(s)
     - [ ] Parse env
 - [ ] Automatic shell upgrader (uses Prober?)
     - [ ] python
@@ -53,7 +58,6 @@
     - [x] Simple testing
     - [ ] Test with multiple real sessions
 - [ ] Upload file
-- [ ] Upload file
 
 ## Utility
 
@@ -67,7 +71,6 @@
 - [ ] Download files
     - [ ] -||-
 - [ ] Logging?
-- [ ] 
 
 ## UX 
 
