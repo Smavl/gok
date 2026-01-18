@@ -39,6 +39,18 @@ gok -p 9001 -b 0.0.0.0   # Specify bind address
 - Type `exit` or `~~~` to escape and return to menu
 
 
+# Testing
+
+You can run the tests with:
+```bash
+# run "unit" tests
+$ go test 
+```
+
+```bash
+# run dockerized integration tests
+$ go test -tags=integration  .
+```
 
 
 Inspired by [penelope](https://github.com/brightio/penelope) 

@@ -3,13 +3,13 @@ package main
 type EventHandler interface {
 	Sessions() *SessionManager
 	ShellMode() *RawShellMode
-	Terminal() *Terminal
+	Terminal() TerminalController
 	Commander() *CommandHandler
 }
 
 func (c *Core) Sessions() *SessionManager  { return c.SessionManager }
 func (c *Core) ShellMode() *RawShellMode   { return c.shellMode }
-func (c *Core) Terminal() *Terminal        { return c.terminal }
+func (c *Core) Terminal() TerminalController { return c.terminal }
 func (c *Core) Commander() *CommandHandler { return c.commander }
 
 type Event interface {

@@ -27,12 +27,12 @@ type ListenerManager interface {
 type ShellListenerManager struct {
 	mu             sync.RWMutex
 	listeners      map[string]*Listener
-	terminal       *Terminal
+	terminal       TerminalController
 	sessionManager *SessionManager
 	eventChan      chan<- Event
 }
 
-func NewShellListenerManager(sm *SessionManager, terminal *Terminal, eventChan chan<- Event) *ShellListenerManager {
+func NewShellListenerManager(sm *SessionManager, terminal TerminalController, eventChan chan<- Event) *ShellListenerManager {
 	return &ShellListenerManager{
 		listeners:      make(map[string]*Listener),
 		sessionManager: sm,
@@ -95,7 +95,7 @@ func (lm *ShellListenerManager) Start(ctx context.Context, addr string, port int
 
 	return l, nil
 }
-func (l *Listener) acceptLoop(sm *SessionManager, terminal *Terminal, eventChan chan<- Event) {
+func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, eventChan chan<- Event) {
 	defer l.wg.Done()
 	defer l.listener.Close()
 

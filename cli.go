@@ -16,6 +16,8 @@ var Flags struct {
 type Config struct {
 	bindIps   []string
 	PortRange PortRange
+	// TODO: testmode/headless mode
+	HeadlessMode bool
 }
 
 type PortRange struct {

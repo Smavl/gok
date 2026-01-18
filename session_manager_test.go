@@ -1,3 +1,4 @@
+// //go:build !integration
 package main
 
 import (
@@ -69,6 +70,8 @@ func TestSessionPopulate(t *testing.T) {
 
 	sm  := NewSessionManager()
 
+	cmdTimeout = TestingTimeout
+
 	for sessions := range 12 {
 
 		// Fake connection
@@ -122,6 +125,8 @@ func TestGetExistingSession(t *testing.T) {
 
 func TestIDUnique(t *testing.T) {
 	sm := NewSessionManager()
+	
+	cmdTimeout = TestingTimeout
 
 	// Add sessions
 	const count = 20
@@ -132,7 +137,7 @@ func TestIDUnique(t *testing.T) {
 	}
 
 	sessions := sm.GetSessions()
-	ids := make(map[int]int) // ID -> count
+	ids := make(map[int]int) 
 
 	for _, s := range sessions {
 		ids[s.ID]++
@@ -153,8 +158,3 @@ func TestIDUnique(t *testing.T) {
 	}
 }
 
-
-// func TestGetExistingSession(t *testing.T) {
-
-// func TestSessionManager_AddSession(t *testing.T) {
-// }

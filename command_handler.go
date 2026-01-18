@@ -9,11 +9,11 @@ import (
 type CommandHandler struct {
 	sessions  *SessionManager
 	listeners *ShellListenerManager
-	terminal  *Terminal
+	terminal  TerminalController
 	shellMode *RawShellMode
 }
 
-func NewCommandHandler(sessions *SessionManager, listeners *ShellListenerManager, terminal *Terminal, shellMode *RawShellMode) *CommandHandler {
+func NewCommandHandler(sessions *SessionManager, listeners *ShellListenerManager, terminal TerminalController, shellMode *RawShellMode) *CommandHandler {
 	return &CommandHandler{
 		sessions:  sessions,
 		listeners: listeners,

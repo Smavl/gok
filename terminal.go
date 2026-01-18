@@ -8,14 +8,29 @@ import (
 	"golang.org/x/term"
 )
 
+type TerminalController interface {
+	SetRaw()
+	Restore()
+	Write(b []byte) (int, error)
+	Message(format string, args ...any)
+	Prompt()
+	ShowError(err error)
+}
+
 type Terminal struct {
 	mu         sync.Mutex
 	savedState *term.State
 	display    Display
 	rawMode    bool
 }
+type HeadlessTerminal struct {
+	mu         sync.Mutex
+	display    Display
+	// rawMode    bool
+	// savedState *term.State
+}
 
-func NewTerminal(display Display) (*Terminal, error) {
+func NewTerminal(display Display) (TerminalController, error) {
 	state, err := term.GetState(int(os.Stdin.Fd()))
 	if err != nil {
 		return nil, err
@@ -79,5 +94,39 @@ func (t *Terminal) Prompt() {
 }
 
 func (t *Terminal) ShowError(err error) {
+	t.Write([]byte(err.Error()))
+}
+
+
+func NewHeadlessTerminal(display Display) (TerminalController, error) {
+	return &HeadlessTerminal{
+		display:    display,
+		// savedState: nil,
+		// rawMode:    false,
+	}, nil
+}
+
+func (t *HeadlessTerminal) Message(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	t.display.Write([]byte(msg))
+}
+
+func (t *HeadlessTerminal) Prompt() {
+	// No prompt in headless mode
+}
+
+func (t *HeadlessTerminal) SetRaw() {
+	// No terminal state to set in headless mode
+}
+
+func (t *HeadlessTerminal) Restore() {
+	// No terminal state to restore in headless mode
+}
+
+func (t *HeadlessTerminal) Write(b []byte) (int, error) {
+	return t.display.Write(b)
+}
+
+func (t *HeadlessTerminal) ShowError(err error) {
 	t.Write([]byte(err.Error()))
 }

@@ -84,8 +84,9 @@ type Session struct {
 	// probing
 	probingBuffer     *HistoryLineBuffer
 	probingDataArrived chan struct{}
-
 	SystemInfo SystemInfo
+	Prober Prober
+
 	// context things
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -200,6 +201,12 @@ func (s *Session) probeSession() error {
 
 	// Fetch binaries
 	prober, err := OS.GetProber(s)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.Prober = prober
+	s.mu.Unlock()
 
 	prober.EnumerateBinaries()
 

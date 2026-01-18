@@ -21,7 +21,7 @@ type Core struct {
 	// Handlers
 	commander *CommandHandler
 	shellMode *RawShellMode
-	terminal  *Terminal
+	terminal  TerminalController
 
 	// event
 	eventChan chan Event
@@ -32,7 +32,17 @@ type Core struct {
 
 func NewCore(cfg Config) *Core {
 	terminalDisplay := NewTerminalDisplay()
-	terminal, err := NewTerminal(terminalDisplay)
+
+	var terminal TerminalController
+	var err error
+
+	// Hacky headless switch
+	if cfg.HeadlessMode {
+		terminal, err = NewHeadlessTerminal(terminalDisplay)
+	} else {
+		terminal, err = NewTerminal(terminalDisplay)
+	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[!] Fatal: Could not setup terminal: %v\n", err)
 		os.Exit(1)

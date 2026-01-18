@@ -16,10 +16,10 @@ type RawShellMode struct {
 
 	sm       *SessionManager
 	im       *InputManagerImpl
-	terminal *Terminal
+	terminal TerminalController
 }
 
-func NewRawShellMode(sessionMan *SessionManager, inputMan *InputManagerImpl, terminal *Terminal) *RawShellMode {
+func NewRawShellMode(sessionMan *SessionManager, inputMan *InputManagerImpl, terminal TerminalController) *RawShellMode {
 	return &RawShellMode{
 		sm:       sessionMan,
 		im:       inputMan,

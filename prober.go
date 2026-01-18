@@ -133,6 +133,7 @@ func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
 
 type Prober interface {
 	EnumerateBinaries()
+	getBinaries() []string
 	// EnumerateUser()
 	// EnumerateUsers()
 }
@@ -140,16 +141,19 @@ type Prober interface {
 func NewLinuxProber(session *Session) *LinuxProber {
 	return &LinuxProber{
 		Session: session,
-		binaries: make([]string, 1),
+		Binaries: make([]string, 1),
 	}
 }
 
 type LinuxProber struct {
 	Session *Session
-	binaries []string
+	Binaries []string
 }
 
 func getExitCode(output []string) (ExitCode, error) {
+	if len(output) == 0 {
+		return 0, fmt.Errorf("no output received")
+	}
 	lastLine := output[len(output)-1]
 	// convert to int - Atoi
 	s := strings.TrimSpace(lastLine)
@@ -160,6 +164,10 @@ func getExitCode(output []string) (ExitCode, error) {
 	}
 	// cast integer to ExitCode 
 	return ExitCode(codeInt), nil
+}
+
+func (prober *LinuxProber) getBinaries() []string {
+	return prober.Binaries
 }
 
 func (prober *LinuxProber) binaryPresent(binary string) (bool,error) {
@@ -175,7 +183,7 @@ func (prober *LinuxProber) binaryPresent(binary string) (bool,error) {
 		return false, err
 	}
 	if whichExitCode == Success {
-		prober.binaries = append(prober.binaries, binary)
+		prober.Binaries = append(prober.Binaries, binary)
 		return true, nil
 	}
 	return false, nil
@@ -184,18 +192,23 @@ func (prober *LinuxProber) binaryPresent(binary string) (bool,error) {
 func (prober *LinuxProber) handleWhichEnumeration() {
 	// Check for which
 	session := prober.Session
+	fmt.Printf("DEBUG: cmdTimeout is %v\n", cmdTimeout) // DEBUG
 	whichCmd := "which which;echo $?\n"
 	ExectuteCmd(session, []byte(whichCmd))
 	waitForOutput(session.probingDataArrived, cmdTimeout)
 
-	whichExitCode,err := getExitCode(session.GetProbingLines())
+	lines := session.GetProbingLines()
+	fmt.Printf("DEBUG: Probing Output: %q\n", lines) // DEBUG
+
+	whichExitCode,err := getExitCode(lines)
 	if err != nil {
+		fmt.Printf("DEBUG: getExitCode error: %v\n", err) // DEBUG
 		// TODO: Return error?
 		return
 	}
 
 	if whichExitCode == Success {
-		prober.binaries = append(prober.binaries, "which")
+		prober.Binaries = append(prober.Binaries, "which")
 	}
 }
 
@@ -207,7 +220,7 @@ func (prober *LinuxProber) EnumerateBinaries() {
 
 	// Check for which
 	prober.handleWhichEnumeration()
-	gotWhich := slices.Contains(prober.binaries,"which")
+	gotWhich := slices.Contains(prober.Binaries,"which")
 	if !gotWhich {
 		return
 	}
@@ -225,6 +238,7 @@ func (prober *LinuxProber) EnumerateBinaries() {
 			continue
 		}
 		if binaryPresent {
+			// debug:
 			session.display.Write(fmt.Appendf(nil, "Binary found: %s\n", binary))
 		}
 	}
