@@ -83,7 +83,7 @@ type Session struct {
 
 	// probing
 	probingBuffer     *HistoryLineBuffer
-	probinDataArrived chan struct{}
+	probingDataArrived chan struct{}
 
 	SystemInfo SystemInfo
 	// context things
@@ -121,7 +121,7 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 		display:           display,
 		history:           CreateLineBuffer(defaultHistoryMaxLines),
 		probingBuffer:     CreateLineBuffer(defaultHistoryMaxLines),
-		probinDataArrived: make(chan struct{}),
+		probingDataArrived: make(chan struct{}),
 		SystemInfo:        SystemInfo{},
 	}
 
@@ -197,11 +197,11 @@ func (s *Session) probeSession() error {
 		return err
 	}
 	s.SystemInfo.OS = OS
-	// TEST: print for debug
-	// s.display.Write([]byte(fmt.Sprintf("Detected OS: %v\n", s.SystemInfo.OS)))
 
 	// Fetch binaries
-	//  binaries
+	prober, err := OS.GetProber(s)
+
+	prober.EnumerateBinaries()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -278,7 +278,7 @@ func (s *Session) outputLoop() {
 				s.probingBuffer.Feed(data)
 				// signal that probing data is incomming
 				select {
-				case s.probinDataArrived <- struct{}{}:
+				case s.probingDataArrived <- struct{}{}:
 				default:
 				}
 			case StateDead:
