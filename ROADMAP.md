@@ -13,14 +13,13 @@
     - [x] Kill sessions
     - [x] Add help menu
 - [x] testing "Setup" 
-    - [x] Docker setup?
+    - [ ] Docker setup?
 - [ ] Testing
     - [x] Parsing of CLI flags (add option to "show flags" to unit test)
-    - [x] More streamlined testing setup?
-    - [ ] 
+    - [ ] More streamlined testing setup
 - [ ] Interactive shell handling
     - [x] Add escaping from session
-    - [ ] Add "meta mode"
+    - [ ] Add "meta mode" inside active shell to run payloads and 
 - [ ] Menu actions
     - [ ] Session details (info from the prober?)
 

@@ -24,17 +24,12 @@ var cmdTimeout = defaultTimeout
 type ExitCode int
 const (
 	// 0 => Success
-	Success ExitCode = iota
+	Success ExitCode = 0
 	// 127 => "Command not found: The command is not recognized or available in the environment’s PATH."
 	CommandNotFound = 127
+	// 255 => "Exit status out of range: Typically, this happens when a script or command exits with a number > 255"
 	ExitStatusOutOfRange = 255
 )
-
-// type Binary int
-//
-// const (
-// 	which binary = iota
-// )
 
 func (o OS) String() string {
 	switch o {
@@ -104,29 +99,10 @@ func hasErrorPattern(lines []string, patterns ...string) bool {
 	return false
 }
 
-func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
-	session.ClearProbingBuffer()
-
-	// five random letters
-	rCmd := rand.Text()[:5] + "\n"
-
-	// execute random command
-	ExectuteCmd(session, []byte(rCmd))
-
-	// wait for the buffer to populate
-	waitForOutput(session.probingDataArrived, cmdTimeout)
-
-	// capture outout and determine os
-	output := session.GetProbingLines()
-
-	// DEBUG
-	//    session.display.Write([]byte("Detected Output:\n"))
-	//    for i, line := range output {
-	// session.display.Write([]byte(fmt.Sprint(i) +" : "+ line))
-	//    }
-
+func inferOsByError(output []string) (OS, error) {
 	var resultOS OS
 	var resultErr error
+
 	switch {
 	// "bash: rCmd: command not found"
 	case hasErrorPattern(output, "command not found"):
@@ -136,6 +112,23 @@ func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
 	}
 
 	return resultOS, resultErr
+}
+
+func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
+	session.ClearProbingBuffer()
+
+	// five random letters
+	rCmd := rand.Text()[:5] + "\n"
+
+	// execute random command
+	ExectuteCmd(session, []byte(rCmd))
+	// wait for the response (buffer to populate)
+	waitForOutput(session.probingDataArrived, cmdTimeout)
+
+	// capture outout and determine os
+	output := session.GetProbingLines()
+
+	return inferOsByError(output)
 }
 
 type Prober interface {
@@ -156,8 +149,8 @@ type LinuxProber struct {
 	binaries []string
 }
 
-func getExitCode(session *Session) (ExitCode, error) {
-	lastLine := session.GetProbingLines()[len(session.GetProbingLines())-1]
+func getExitCode(output []string) (ExitCode, error) {
+	lastLine := output[len(output)-1]
 	// convert to int - Atoi
 	s := strings.TrimSpace(lastLine)
 	codeInt, err := strconv.Atoi(s)
@@ -176,7 +169,8 @@ func (prober *LinuxProber) binaryPresent(binary string) (bool,error) {
 	ExectuteCmd(session, []byte(whichCmd))
 	waitForOutput(session.probingDataArrived, cmdTimeout)
 
-	whichExitCode,err := getExitCode(session)
+	output := session.GetProbingLines()
+	whichExitCode,err := getExitCode(output)
 	if err != nil {
 		return false, err
 	}
@@ -193,15 +187,10 @@ func (prober *LinuxProber) handleWhichEnumeration() {
 	whichCmd := "which which;echo $?\n"
 	ExectuteCmd(session, []byte(whichCmd))
 	waitForOutput(session.probingDataArrived, cmdTimeout)
-	// output := session.GetProbingLines()
-	// DEBUG:
-	// session.display.Write([]byte("Detected Output:\n"))
-	// for i, line := range output {
-	// 	session.display.Write([]byte(fmt.Sprint(i) +" : "+ line))
-	// }
-	whichExitCode,err := getExitCode(session)
+
+	whichExitCode,err := getExitCode(session.GetProbingLines())
 	if err != nil {
-		// session.display.Write([]byte("Error getting exit code for which command\n"))
+		// TODO: Return error?
 		return
 	}
 
