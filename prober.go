@@ -12,14 +12,11 @@ import (
 type OS int
 
 const (
-	Linux OS = iota
-	Unknown
+	Unknown OS = iota
+	Linux 
 )
 
-const defaultTimeout = 200*time.Millisecond
-const TestingTimeout = 2*time.Millisecond
-
-var cmdTimeout = defaultTimeout
+// var cmdTimeout = defaultTimeout
 
 type ExitCode int
 const (
@@ -55,10 +52,11 @@ func (e ExitCode) String() string {
 	}
 }
 
-func (o OS) GetProber(session *Session) (Prober, error) {
+// TODO: Rename to GetNewProber
+func (o OS) GetProber(session *Session, probeOpts ProberOptions) (Prober, error) {
 	switch o {
 	case Linux: 
-		return NewLinuxProber(session), nil
+		return NewLinuxProber(session, probeOpts), nil
 	default: return nil, NoProberForOs 
 	}
 }
@@ -68,6 +66,7 @@ type DetermineOSStrategy interface {
 }
 
 type RandomCommandStrategy struct {
+	cmdTimeout time.Duration
 }
 
 func ExectuteCmd(session *Session, cmd []byte) {
@@ -115,6 +114,8 @@ func inferOsByError(output []string) (OS, error) {
 }
 
 func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
+	// DEBUG:
+	fmt.Printf("DEBUG: DetermineOS - cmdTimeout is %v\n", rs.cmdTimeout)
 	session.ClearProbingBuffer()
 
 	// five random letters
@@ -123,10 +124,11 @@ func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
 	// execute random command
 	ExectuteCmd(session, []byte(rCmd))
 	// wait for the response (buffer to populate)
-	waitForOutput(session.probingDataArrived, cmdTimeout)
+	waitForOutput(session.probingDataArrived, rs.cmdTimeout)
 
 	// capture outout and determine os
 	output := session.GetProbingLines()
+	fmt.Printf("DEBUG: Probing Output: %q\n", output) // DEBUG
 
 	return inferOsByError(output)
 }
@@ -138,16 +140,22 @@ type Prober interface {
 	// EnumerateUsers()
 }
 
-func NewLinuxProber(session *Session) *LinuxProber {
+type ProberOptions struct {
+	cmdTimeout time.Duration
+}
+
+func NewLinuxProber(session *Session, probeOpts ProberOptions) *LinuxProber {
 	return &LinuxProber{
 		Session: session,
 		Binaries: make([]string, 1),
+		cmdTimeout: probeOpts.cmdTimeout,
 	}
 }
 
 type LinuxProber struct {
 	Session *Session
 	Binaries []string
+	cmdTimeout time.Duration
 }
 
 func getExitCode(output []string) (ExitCode, error) {
@@ -175,7 +183,7 @@ func (prober *LinuxProber) binaryPresent(binary string) (bool,error) {
 
 	whichCmd := fmt.Sprintf("which %s;echo $?\n", binary)
 	ExectuteCmd(session, []byte(whichCmd))
-	waitForOutput(session.probingDataArrived, cmdTimeout)
+	waitForOutput(session.probingDataArrived, prober.cmdTimeout)
 
 	output := session.GetProbingLines()
 	whichExitCode,err := getExitCode(output)
@@ -192,10 +200,10 @@ func (prober *LinuxProber) binaryPresent(binary string) (bool,error) {
 func (prober *LinuxProber) handleWhichEnumeration() {
 	// Check for which
 	session := prober.Session
-	fmt.Printf("DEBUG: cmdTimeout is %v\n", cmdTimeout) // DEBUG
+	fmt.Printf("DEBUG: cmdTimeout is %v\n", prober.cmdTimeout) // DEBUG
 	whichCmd := "which which;echo $?\n"
 	ExectuteCmd(session, []byte(whichCmd))
-	waitForOutput(session.probingDataArrived, cmdTimeout)
+	waitForOutput(session.probingDataArrived, prober.cmdTimeout)
 
 	lines := session.GetProbingLines()
 	fmt.Printf("DEBUG: Probing Output: %q\n", lines) // DEBUG

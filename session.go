@@ -86,6 +86,7 @@ type Session struct {
 	probingDataArrived chan struct{}
 	SystemInfo SystemInfo
 	Prober Prober
+	probeOpts ProberOptions
 
 	// context things
 	ctx    context.Context
@@ -97,12 +98,14 @@ type SessionManager struct {
 	mu        sync.RWMutex
 	currentID int
 	sessions  map[int]*Session
+	probeOpts ProberOptions
 }
 
-func NewSessionManager() *SessionManager {
+func NewSessionManager(probeOpts ProberOptions) *SessionManager {
 	return &SessionManager{
 		currentID: 0,
 		sessions:  make(map[int]*Session),
+		probeOpts: probeOpts,
 	}
 }
 
@@ -124,6 +127,7 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 		probingBuffer:     CreateLineBuffer(defaultHistoryMaxLines),
 		probingDataArrived: make(chan struct{}),
 		SystemInfo:        SystemInfo{},
+		probeOpts:         sm.probeOpts,
 	}
 
 	sm.mu.Lock()
@@ -192,7 +196,7 @@ func (s *Session) probeSession() error {
 	s.state = StateProbing
 	s.mu.Unlock()
 	// get os
-	rcmds := RandomCommandStrategy{}
+	rcmds := RandomCommandStrategy{ cmdTimeout: s.probeOpts.cmdTimeout }
 	OS, err := rcmds.DetermineOS(s)
 	if err != nil {
 		return err
@@ -200,7 +204,7 @@ func (s *Session) probeSession() error {
 	s.SystemInfo.OS = OS
 
 	// Fetch binaries
-	prober, err := OS.GetProber(s)
+	prober, err := OS.GetProber(s, s.probeOpts)
 	if err != nil {
 		return err
 	}

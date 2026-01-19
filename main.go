@@ -42,6 +42,7 @@ func main() {
 	config := Config{
 		PortRange: Flags.PortRange,
 		bindIps:   Flags.BoundIPs,
+		ProbingCmdTimeout: Flags.ProbingCmdTimeout,
 	}
 
 	core := NewCore(config)

@@ -50,7 +50,9 @@ func NewCore(cfg Config) *Core {
 
 	eventChan := make(chan Event)
 	inputMan := NewInputManager(NewLineReader(), eventChan)
-	sm := NewSessionManager()
+	sm := NewSessionManager(ProberOptions{
+		cmdTimeout: cfg.ProbingCmdTimeout,
+	})
 	slm := NewShellListenerManager(sm, terminal, eventChan)
 	shellMode := NewRawShellMode(sm, inputMan, terminal)
 

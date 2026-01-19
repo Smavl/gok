@@ -12,7 +12,6 @@ import (
 
 func TestRevshellSimple(t *testing.T) {
   // adjust test delay
-  cmdTimeout = 100 * time.Millisecond
 
   // start gok core 
   hostIP := "0.0.0.0"     // Bind gok to listen on all interfaces
@@ -25,6 +24,7 @@ func TestRevshellSimple(t *testing.T) {
     bindIps:   []string{hostIP},
     // NOTE: Test/Headless mode
     HeadlessMode: true,
+    ProbingCmdTimeout: 200 * time.Millisecond,
   }
   core := NewCore(cfg)
   go core.Start()
@@ -43,11 +43,17 @@ func TestRevshellSimple(t *testing.T) {
   require.Eventually(t, func() bool {
     sessions := core.SessionManager.GetSessions()
     return len(sessions) == 1
-  }, 2*time.Second, 500*time.Millisecond, "Expected one session to be established")
+  }, 2*time.Second, 50*time.Millisecond, "Expected one session to be established")
+
 
   // TEST: OS of Session should be Linux
-  sessions := core.SessionManager.GetSessions()
-  require.Equal(t, Linux, sessions[0].SystemInfo.OS, "Expected session OS to be Linux")
+  require.Eventually(t, func() bool {
+    s, err := core.SessionManager.Get(0)
+    if err != nil { return false }
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    return s.SystemInfo.OS == Linux
+  }, 2*time.Second, 100*time.Millisecond, "Expected session OS to be Linux")
 
 
   // Wait for Prober to be initialized
@@ -58,7 +64,7 @@ func TestRevshellSimple(t *testing.T) {
     s.mu.Lock()
     defer s.mu.Unlock()
     return s.state == StateBackgrounded && s.Prober != nil
-  }, 10*time.Second, 100*time.Millisecond, "Timed out waiting for Prober initialization")
+  }, 20*time.Second, 100*time.Millisecond, "Timed out waiting for Prober initialization")
 
 
   // TEST: Binaries: `which`, `perl` should be detected

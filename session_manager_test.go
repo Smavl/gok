@@ -7,13 +7,12 @@ import (
 )
 
 
-func init()  {
-	cmdTimeout = TestingTimeout
+func newTestSessionManager() *SessionManager {
+	return NewSessionManager(ProberOptions{})
 }
 
-
 func TestIdIncrement(t *testing.T) {
-	sm  := NewSessionManager()
+	sm  := newTestSessionManager()
 
 	before := sm.currentID
 	sm.incID()
@@ -25,7 +24,7 @@ func TestIdIncrement(t *testing.T) {
 }
 
 func TestGetNon_existentSession(t *testing.T) {
-	sm  := NewSessionManager()
+	sm  := newTestSessionManager()
 
 	// test 10 first ids
 	for i := range 10 {
@@ -48,7 +47,7 @@ func TestGetNon_existentSession(t *testing.T) {
 
 
 func TestAddFakeSession(t *testing.T) {
-	sm  := NewSessionManager()
+	sm  := newTestSessionManager()
 
 	// Fake connection
 	fakeConn, client := net.Pipe()
@@ -67,9 +66,7 @@ func TestAddFakeSession(t *testing.T) {
 
 func TestSessionPopulate(t *testing.T) {
 
-	sm  := NewSessionManager()
-
-	cmdTimeout = TestingTimeout
+	sm  := newTestSessionManager()
 
 	for sessions := range 12 {
 
@@ -99,7 +96,7 @@ func TestSessionPopulate(t *testing.T) {
 
 
 func TestGetExistingSession(t *testing.T) {
-	sm := NewSessionManager()
+	sm := newTestSessionManager()
 
 	// Add a session
 	fakeConn, client := net.Pipe()
@@ -123,10 +120,8 @@ func TestGetExistingSession(t *testing.T) {
 }
 
 func TestIDUnique(t *testing.T) {
-	sm := NewSessionManager()
+	sm := newTestSessionManager()
 	
-	cmdTimeout = TestingTimeout
-
 	// Add sessions
 	const count = 20
 	for range count {

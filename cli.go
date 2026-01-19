@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
 )
@@ -11,11 +12,14 @@ import (
 var Flags struct {
 	PortRange PortRange `help:"Ports to listen on" default:"9001" short:"p"`
 	BoundIPs  []string  `help:"IPs to bind the listeners on" default:"[0.0.0.0]" short:"b"`
+	// timeout flags
+	ProbingCmdTimeout time.Duration `help:"Timeout for probing commands" default:"200ms" short:"t"`
 }
 
 type Config struct {
 	bindIps   []string
 	PortRange PortRange
+	ProbingCmdTimeout time.Duration
 	// TODO: testmode/headless mode
 	HeadlessMode bool
 }
