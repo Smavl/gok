@@ -97,10 +97,10 @@ func (ch *CommandHandler) showHelp() {
 	helpText := `Available Commands:
   listeners, lis, l         - List all active listeners
   sessions, sesh, sess, s   - List all active sessions
-  interact, int, i <id>     - Interact with a session by its ID
-  kill, k <id>              - Kill a session by its ID
+  interact, int, i <id>     - Interact with a session
+  kill, k <id>              - Kill a session
   help, h                   - Show this help message
-  exit, quit                - Exit the application
+  exit, quit, q             - Exit the application
 `
 	ch.terminal.Message("%s", helpText)
 }
@@ -131,7 +131,7 @@ func (ch *CommandHandler) Execute(input string) {
 	case "help", "h":
 		ch.showHelp()
 
-	case "exit", "quit":
+	case "exit", "quit", "q":
 		os.Exit(0)
 
 	default:

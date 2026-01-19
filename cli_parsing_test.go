@@ -1,4 +1,3 @@
-//go:build !integration
 package main
 
 import (
@@ -47,6 +46,7 @@ func TestPortRangeTableDriven(t *testing.T) {
 			wantErr: false,
 		},
 		// Negative test cases
+		// Delimiter tests
 		{
 			name:    "Wrong Delimiter: _",
 			arg:     "9000_9005",
@@ -55,6 +55,11 @@ func TestPortRangeTableDriven(t *testing.T) {
 		{
 			name:    "Wrong Delimiter: ...",
 			arg:     "9000...9005",
+			wantErr: true,
+		},
+		{
+			name:    "Wrong Delimiter: ,",
+			arg:     "9000,9005",
 			wantErr: true,
 		},
 		{

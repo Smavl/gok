@@ -1,8 +1,11 @@
 {
   "lspconfig": {
     "gopls": {
-      "buildFlags": ["-tags=integration"]
+      "settings": {
+        "gopls": {
+        }
+      }
     }
+
   }
 }
-

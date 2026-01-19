@@ -1,42 +1,89 @@
-# Gok - (Reverse) Shell Handler
+Gok - (Reverse) Shell Handler 
+===
+Gok is a feature-rich (reverse) shell handler and offensive utility tool. 
 
-## Features
+Gok aims to replace the muscle memory of `nc -lvnp 9001` with `gok -p 9001`, and to fast-track the exploitation and/or enumeration process immediately after the shell lands. By providing essential utilities and features, it remains useful beyond landing and upgrading the shell.
 
-- Listen on multiple ports simultaneously
-- Manage multiple reverse shell sessions
-- Session switching and escaping
-- Simple command interface (sessions, listeners, interact)
+# Features
 
-## Installation
+**Core features**
+- Manage multiple listeners and sessions
+  - Specify multiple IP addresses and ports
+  - Jump between multiple sessions (History persistance)
+- Automatic shell upgrading (WIP)
+- (Somewhat) Asynchronous and event-driven architecture
+- Cross-platform support (Linux, Windows, MacOS) (WIP)
+- Automatically gather system information:
+  - Detect OS
+  - Enumerate available Binaries 
+  - ...
+
+**Modes**
+- Menu mode - Main management interface
+  - Command interface (Manage: sessions, listeners)
+  - Manage multiple reverse shell sessions
+  - Session interaction switching and escaping
+- Shell mode - Raw shell interaction
+  - Byte-by-byte shell interaction (no line-buffering)
+  - Escape and resume sessions seamlessly.
+- Meta mode (WIP)
+  - Run scripts/modules
+  - Utility: download, upload tools
+
+
+
+# Installation
+
+## **Requirements:**
+- `go`
+
+Optional:
+- `docker` (for integration tests)
+
+## Running Gok
 
 **Build from source:**
 ```bash
+# Clone repo
 git clone https://github.com/smavl/gok
 cd gok
+# build binary
 go build
-./gok -p 9001
+./gok
+# Or run directly with go
+go run .
 ```
-
-**Requirements:**
-- `go`
-
-## Basic usage
-
-**Start listener:**
+**one-line: (WIP)**
 ```bash
-gok -p 9001              # Single port
-gok -p 9001-9005         # Port range
-gok -p 9001 -b 0.0.0.0   # Specify bind address
+#go install github.com/smavl/gok@latest
+#gok -p 9001
 ```
+
+# Using Gok
+## Basic Usage
+
+**Specify listener(s):**
+```bash
+$ gok -p 9001              # Single port
+$ gok -p 9001-9005         # Port range
+$ gok -p 9001 -b 0.0.0.0   # Specify bind address for listener(s)
+```
+
 
 **Menu commands:**
-- `sessions` (or `s`) - List active sessions
-- `listeners` (or `l`) - List active listeners
-- `interact <id>` (or `i <id>`) - Interact with session
+```
+GOK > help
+Available Commands:
+  listeners, lis, l         - List all active listeners
+  sessions, sesh, sess, s   - List all active sessions
+  interact, int, i <id>     - Interact with a session
+  kill, k <id>              - Kill a session
+  help, h                   - Show this help message
+  exit, quit, q             - Exit the application
+```
 
-
-**Shell interaction**
-- Type `exit` or `~~~` to escape and return to menu
+**Session interaction:**
+- Escape by hitting `Ctrl+D` to background the session and return to menu mode
 
 
 # Testing
@@ -52,5 +99,6 @@ $ go test
 $ go test -tags=integration  .
 ```
 
+# Kudos
 
-Inspired by [penelope](https://github.com/brightio/penelope) 
+This was inspired by [penelope](https://github.com/brightio/penelope) which I encourage all to check out!

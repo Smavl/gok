@@ -17,7 +17,7 @@ import (
 //       ░     ░ ░  ░  ░
 // Gok: Reverse shell handler
 
-const VERSION = "0.0"
+const VERSION = "0.1"
 
 func main() {
 	fmt.Println()
@@ -34,7 +34,7 @@ func main() {
 		"\t░ ░   ░ ░ ░ ░ ▒  ░ ░░ ░ \n",
 		"\t      ░     ░ ░  ░  ░   \n",
 		"")
-	fmt.Printf("\tVersion: %s (Alpha)", VERSION)
+	fmt.Printf("\tVersion: %s", VERSION)
 	fmt.Println()
 
 	kong.Parse(&Flags)
