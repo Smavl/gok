@@ -26,22 +26,21 @@
 ## Version 0.1
 
 - [x] Timeout refactor
+- [ ] Refactor directory structure
 - [ ] CLI flags
     - [x] Timeout flag(s)
     - [ ] Probing flags (modes)
-- [ ] Menu actions
-    - [ ] Session details (info from the prober?)
 - [ ] Prober 
     - [ ] Modes (Default, Agressive, stealth)
-    - [ ] Add delimiter to optimize performance of enumeration
-- [ ] Prober (linux)
-    - [ ] EnumerateUser
-    - [ ] EnumerateUsers
+    - [x] Add delimiter to optimize performance of enumeration
 
 ## Version 0.2
 
-- [ ] Debugging- and/or general logs
 - [ ] CLI flags
+    - [ ] Debug/log flag
+- [ ] Debugging- and/or general logs
+- [ ] Menu actions
+    - [ ] Session details (info from the prober?)
 - [ ] Meta mode
     - [ ] Add escaping
     - [ ] Implement line-buffered input handler
@@ -49,6 +48,9 @@
 - [ ] Automatic shell upgrading 
     - [ ] Simple shell upgrading implementation (python)
     - [ ] CLI flag: Automatically drop into shell (default)
+- [ ] Prober (linux)
+    - [ ] EnumerateUser
+    - [ ] EnumerateUsers
 
 # Roadmap - Long term
 

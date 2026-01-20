@@ -195,6 +195,7 @@ func (s *Session) probeSession() error {
 	s.mu.Lock()
 	s.state = StateProbing
 	s.mu.Unlock()
+
 	// get os
 	rcmds := RandomCommandStrategy{ cmdTimeout: s.probeOpts.cmdTimeout }
 	OS, err := rcmds.DetermineOS(s)
@@ -287,11 +288,13 @@ func (s *Session) outputLoop() {
 			//
 			case StateProbing:
 				s.probingBuffer.Feed(data)
-				// signal that probing data is incomming
+				s.mu.Unlock()
+				// signal that probing data is incomming (after releasing lock to avoid blocking)
 				select {
 				case s.probingDataArrived <- struct{}{}:
 				default:
 				}
+				continue
 			case StateDead:
 				s.mu.Unlock()
 				return
