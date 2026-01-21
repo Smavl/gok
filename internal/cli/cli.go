@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -17,8 +17,8 @@ var Flags struct {
 }
 
 type Config struct {
-	bindIps   []string
-	PortRange PortRange
+	BindIps           []string
+	PortRange         PortRange
 	ProbingCmdTimeout time.Duration
 	// TODO: testmode/headless mode
 	HeadlessMode bool

@@ -1,6 +1,10 @@
-package main
+package prober
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/smavl/gok/internal/misc"
+)
 
 
 // test error based os detection
@@ -68,13 +72,13 @@ func TestInferErrorBasedOSDetection(t *testing.T) {
 			name:    "Garbage string",
 			output:  []string{"sdhgbjskdb"},
 			wantOS:  Unknown,
-			wantErr: CouldNotDetermineOSError,
+			wantErr: misc.CouldNotDetermineOSError,
 		},
 		{
 			name:    "Empty string",
 			output:  []string{""},
 			wantOS:  Unknown,
-			wantErr: CouldNotDetermineOSError,
+			wantErr: misc.CouldNotDetermineOSError,
 		},
 }
 	for _, tt := range tests {

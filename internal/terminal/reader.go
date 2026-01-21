@@ -1,11 +1,20 @@
-package main
+package terminal
 
 import (
 	"os"
 )
 
+// Event types that terminal produces
+type ShellByteEvent struct {
+	Byte byte
+}
+
+type MenuCmdEvent struct {
+	Input string
+}
+
 type InputReader interface {
-	Read() Event
+	Read() any
 }
 
 type LineReader struct {
@@ -19,7 +28,7 @@ func NewLineReader() *LineReader {
 	}
 }
 
-func (r *LineReader) Read() Event {
+func (r *LineReader) Read() any {
 	n, err := os.Stdin.Read(r.buf[:])
 	if err != nil || n == 0 {
 		return nil
@@ -44,7 +53,7 @@ func NewByteReader() *ByteReader {
 	return &ByteReader{}
 }
 
-func (r *ByteReader) Read() Event {
+func (r *ByteReader) Read() any {
 	n, err := os.Stdin.Read(r.buf[:])
 	if err != nil || n == 0 {
 		return nil

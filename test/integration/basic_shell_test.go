@@ -7,6 +7,10 @@ import (
   "testing"
   "time"
 
+  "github.com/smavl/gok/internal/cli"
+  "github.com/smavl/gok/internal/core"
+  "github.com/smavl/gok/internal/prober"
+  "github.com/smavl/gok/internal/session"
   "github.com/stretchr/testify/require"
 )
 
@@ -19,17 +23,17 @@ func TestRevshellSimple(t *testing.T) {
   hostPort := 9001
 
   // Start gok core in headless/test mode
-  probingCmdTimeout := 50 * time.Millisecond
-  cfg := Config{
-    PortRange: PortRange{ Ports: []int{hostPort} },
-    bindIps:   []string{hostIP},
+  probingCmdTimeout := 60 * time.Millisecond
+  cfg := cli.Config{
+    PortRange: cli.PortRange{ Ports: []int{hostPort} },
+    BindIps:   []string{hostIP},
     // NOTE: Test/Headless mode
     HeadlessMode: true,
     // Should be enough for test environment
     ProbingCmdTimeout: probingCmdTimeout,
   }
-  core := NewCore(cfg)
-  go core.Start()
+  c := core.NewCore(cfg)
+  go c.Start()
 
   // Start the test container
   tc := StartContainer(t, "ubuntu:22.04")
@@ -44,34 +48,30 @@ func TestRevshellSimple(t *testing.T) {
 
   // TEST: Session lands
   require.Eventually(t, func() bool {
-    sessions := core.SessionManager.GetSessions()
+    sessions := c.SessionManager.GetSessions()
     return len(sessions) == 1
   }, 1*time.Second, 2*time.Millisecond, "Expected one session to be established")
 
 
   // TEST: OS of Session should be Linux
-  var s *Session
+  var s *session.Session
   var err error
   require.Eventually(t, func() bool {
-    s, err = core.SessionManager.Get(0)
+    s, err = c.SessionManager.Get(0)
     if err != nil { return false }
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    return s.SystemInfo.OS == Linux
+    return s.SystemInfo.OS == prober.Linux
   }, 1*time.Second, 2*time.Millisecond, "Expected session OS to be Linux")
 
 
-  // Wait for Prober to be initialized
+  // Wait for Prober to be initialized AND enumeration to complete (state = StateBackgrounded)
   require.Eventually(t, func() bool {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    return s.state == StateBackgrounded && s.Prober != nil
-  }, 5*time.Second, 20*time.Millisecond, "Timed out waiting for Prober initialization")
+    return s.IsProberDone()
+  }, 5*time.Second, 20*time.Millisecond, "Timed out waiting for Prober initialization and binary enumeration")
 
 
   // TEST: Binaries: `which`, `perl` should be detected
   // require.NoError(t, err)
-  binaries := s.Prober.getBinaries()
+  binaries := s.Prober.GetBinaries()
   require.Contains(t, binaries, "which", "Expected 'which' binary to be detected")
   require.Contains(t, binaries, "perl", "Expected 'perl' binary to be detected")
   require.Contains(t, binaries, "base64", "Expected 'base64' binary to be detected")

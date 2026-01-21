@@ -1,4 +1,4 @@
-package main
+package prober
 
 import (
 	"context"
@@ -8,7 +8,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/smavl/gok/internal/misc"
 )
+
+// SessionInterface defines the minimal interface that prober needs from a session
+// This avoids circular dependency with the session package
+type SessionInterface interface {
+	Write([]byte) (int, error)
+	GetProbingLines() []string
+	ClearProbingBuffer()
+	GetProbingDataChannel() <-chan struct{}
+}
 
 type OS int
 
@@ -17,10 +28,10 @@ const (
 	Linux
 )
 
-type ExitCode int
+type BashExitCode int
 const (
 	// 0 => Success
-	Success ExitCode = 0
+	Success BashExitCode = 0
 	// 127 => "Command not found: The command is not recognized or available in the environment’s PATH."
 	CommandNotFound = 127
 	// 255 => "Exit status out of range: Typically, this happens when a script or command exits with a number > 255"
@@ -38,7 +49,7 @@ func (o OS) String() string {
 	}
 }
 
-func (e ExitCode) String() string {
+func (e BashExitCode) String() string {
 	switch e {
 	case Success:
 		return "Success"
@@ -52,11 +63,11 @@ func (e ExitCode) String() string {
 }
 
 // TODO: Rename to GetNewProber
-func (o OS) GetProber(session *Session, probeOpts ProberOptions) (Prober, error) {
+func (o OS) GetNewProber(sess SessionInterface, probeOpts ProberOptions) (Prober, error) {
 	switch o {
-	case Linux: 
-		return NewLinuxProber(session, probeOpts), nil
-	default: return nil, NoProberForOs 
+	case Linux:
+		return NewLinuxProber(sess, probeOpts), nil
+	default: return nil, misc.NoProberForOs
 	}
 }
 
@@ -65,14 +76,14 @@ type DetermineOSStrategy interface {
 }
 
 type RandomCommandStrategy struct {
-	cmdTimeout time.Duration
+	CmdTimeout time.Duration
 }
 
-func ExecuteCmd(session *Session, cmd []byte) {
-	session.Write([]byte(cmd))
+func ExecuteCmd(sess SessionInterface, cmd []byte) {
+	sess.Write([]byte(cmd))
 }
 
-func waitForOutput(dataArrived chan struct{}, timeout time.Duration) {
+func waitForOutput(dataArrived <-chan struct{}, timeout time.Duration) {
 	for {
 		select {
 		case <-dataArrived:
@@ -81,15 +92,15 @@ func waitForOutput(dataArrived chan struct{}, timeout time.Duration) {
 		}
 	}
 }
-func waitForOutputUsingDelimeter(session *Session, delimiter string, timeout time.Duration) {
+func waitForOutputUsingDelimeter(sess SessionInterface, delimiter string, timeout time.Duration) {
 	// Make cancelable
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	for {
 		select {
-		case <-session.probingDataArrived:
+		case <-sess.GetProbingDataChannel():
 			// check for delimiter to minimize wait time
-			if endDelimiterFound(session, delimiter) {
+			if endDelimiterFound(sess, delimiter) {
 				return
 			}
 		case <-ctx.Done():
@@ -98,10 +109,8 @@ func waitForOutputUsingDelimeter(session *Session, delimiter string, timeout tim
 	}
 }
 
-func endDelimiterFound(session *Session, delimiter string) bool {
-	session.mu.Lock()
-	defer session.mu.Unlock()
-	lines := session.probingBuffer.lines
+func endDelimiterFound(sess SessionInterface, delimiter string) bool {
+	lines := sess.GetProbingLines()
 	if len(lines) == 0 {
 		return false
 	}
@@ -131,55 +140,55 @@ func inferOsByError(output []string) (OS, error) {
 	case hasErrorPattern(output, "command not found"):
 		resultOS, resultErr = Linux, nil
 	default:
-		resultOS, resultErr = Unknown, CouldNotDetermineOSError
+		resultOS, resultErr = Unknown, misc.CouldNotDetermineOSError
 	}
 
 	return resultOS, resultErr
 }
 
-func (rs *RandomCommandStrategy) DetermineOS(session *Session) (OS, error) {
-	session.ClearProbingBuffer()
+func (rs *RandomCommandStrategy) DetermineOS(sess SessionInterface) (OS, error) {
+	sess.ClearProbingBuffer()
 
 	// five random letters
 	rCmd := rand.Text()[:5] + "\n"
 
 	// execute random command
-	ExecuteCmd(session, []byte(rCmd))
+	ExecuteCmd(sess, []byte(rCmd))
 	// wait for the response (buffer to populate)
-	waitForOutput(session.probingDataArrived, rs.cmdTimeout)
+	waitForOutput(sess.GetProbingDataChannel(), rs.CmdTimeout)
 
 	// capture outout and determine os
-	output := session.GetProbingLines()
+	output := sess.GetProbingLines()
 
 	return inferOsByError(output)
 }
 
 type Prober interface {
 	EnumerateBinaries()
-	getBinaries() []string
+	GetBinaries() []string
 	// EnumerateUser()
 	// EnumerateUsers()
 }
 
 type ProberOptions struct {
-	cmdTimeout time.Duration
+	CmdTimeout time.Duration
 }
 
-func NewLinuxProber(session *Session, probeOpts ProberOptions) *LinuxProber {
+func NewLinuxProber(sess SessionInterface, probeOpts ProberOptions) *LinuxProber {
 	return &LinuxProber{
-		Session: session,
-		Binaries: make([]string, 0),
-		cmdTimeout: probeOpts.cmdTimeout,
+		Session:    sess,
+		Binaries:   make([]string, 0),
+		CmdTimeout: probeOpts.CmdTimeout,
 	}
 }
 
 type LinuxProber struct {
-	Session *Session
-	Binaries []string
-	cmdTimeout time.Duration
+	Session    SessionInterface
+	Binaries   []string
+	CmdTimeout time.Duration
 }
 
-func getExitCode(output []string, delimiter string) (ExitCode, error) {
+func getExitCode(output []string, delimiter string) (BashExitCode, error) {
 
 	if len(output) == 0 {
 		return 0, fmt.Errorf("no output received")
@@ -214,10 +223,10 @@ func getExitCode(output []string, delimiter string) (ExitCode, error) {
 		return 0, err
 	}
 	// cast integer to ExitCode
-	return ExitCode(codeInt), nil
+	return BashExitCode(codeInt), nil
 }
 
-func (prober *LinuxProber) getBinaries() []string {
+func (prober *LinuxProber) GetBinaries() []string {
 	return prober.Binaries
 }
 
@@ -236,7 +245,7 @@ func (prober *LinuxProber) binariesPresentFast(binaries []string) (map[string]bo
 	fmt.Fprintf(&whichCompoundCmds, ")\";echo '%s'\n", delimiter)
 	fmt.Printf("Executing compound which command: %s", whichCompoundCmds.String())
 	ExecuteCmd(session, []byte(whichCompoundCmds.String()))
-	waitForOutputUsingDelimeter(session, delimiter, prober.cmdTimeout)
+	waitForOutputUsingDelimeter(session, delimiter, prober.CmdTimeout)
 
 	output := session.GetProbingLines()
 	// Skip first line (always command echo)
@@ -268,7 +277,7 @@ func (prober *LinuxProber) binaryPresentFast(binary string) (bool, error) {
 	delimiter := "¤"
 	whichCmd := fmt.Sprintf("echo \"$(which %s >/dev/null 2>&1; echo $?)\";echo '%s'\n", binary, delimiter)
 	ExecuteCmd(session, []byte(whichCmd))
-	waitForOutputUsingDelimeter(session, delimiter, prober.cmdTimeout)
+	waitForOutputUsingDelimeter(session, delimiter, prober.CmdTimeout)
 
 	output := session.GetProbingLines()
 	// Skip first line (always command echo)
@@ -295,7 +304,7 @@ func (prober *LinuxProber) binaryPresent(binary string) (bool, error) {
 	//> 0
 	whichCmd := fmt.Sprintf("echo \"$(which %s>/dev/null 2>&1; echo $?)\"\n", binary)
 	ExecuteCmd(session, []byte(whichCmd))
-	waitForOutput(session.probingDataArrived, prober.cmdTimeout)
+	waitForOutput(session.GetProbingDataChannel(), prober.CmdTimeout)
 
 	output := session.GetProbingLines()
 	whichExitCode, err := getExitCode(output, "")
@@ -316,7 +325,7 @@ func (prober *LinuxProber) handleWhichEnumeration() {
 	delimiter := "¤"
 	whichCmd := fmt.Sprintf("echo \"$(which which>/dev/null 2>&1; echo $?)\";echo '%s'\n", delimiter)
 	ExecuteCmd(session, []byte(whichCmd))
-	waitForOutputUsingDelimeter(session, delimiter, prober.cmdTimeout)
+	waitForOutputUsingDelimeter(session, delimiter, prober.CmdTimeout)
 
 	lines := session.GetProbingLines()
 

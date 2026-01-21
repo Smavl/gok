@@ -1,4 +1,4 @@
-package main
+package session
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/smavl/gok/internal/cli"
 )
 
 type Listener struct {
@@ -18,8 +20,20 @@ type Listener struct {
 	wg       sync.WaitGroup
 }
 
+// TerminalController is a minimal interface to avoid circular imports
+type TerminalController interface {
+	Message(format string, a ...any)
+	Write([]byte) (int, error)
+}
+
+// SessionConnectedEvent is sent when a new session connects
+// It's defined here to avoid circular imports with core
+type SessionConnectedEvent struct {
+	Session *Session
+}
+
 type ListenerManager interface {
-	Init(config Config)
+	Init(config cli.Config)
 	Start(addr string, port int) (*Listener, error)
 	GetAddresses() []string
 }
@@ -29,10 +43,10 @@ type ShellListenerManager struct {
 	listeners      map[string]*Listener
 	terminal       TerminalController
 	sessionManager *SessionManager
-	eventChan      chan<- Event
+	eventChan      chan<- any // Use any to avoid importing core
 }
 
-func NewShellListenerManager(sm *SessionManager, terminal TerminalController, eventChan chan<- Event) *ShellListenerManager {
+func NewShellListenerManager(sm *SessionManager, terminal TerminalController, eventChan chan<- any) *ShellListenerManager {
 	return &ShellListenerManager{
 		listeners:      make(map[string]*Listener),
 		sessionManager: sm,
@@ -41,10 +55,10 @@ func NewShellListenerManager(sm *SessionManager, terminal TerminalController, ev
 	}
 }
 
-func (lm *ShellListenerManager) Init(ctx context.Context, config Config) {
+func (lm *ShellListenerManager) Init(ctx context.Context, config cli.Config) {
 	lm.terminal.Message("[+] Initializing listeners:\n\t")
 
-	for _, addr := range config.bindIps {
+	for _, addr := range config.BindIps {
 		for _, port := range config.PortRange.Ports {
 			lm.terminal.Message("%s:%d ", addr, port)
 
@@ -95,7 +109,7 @@ func (lm *ShellListenerManager) Start(ctx context.Context, addr string, port int
 
 	return l, nil
 }
-func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, eventChan chan<- Event) {
+func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, eventChan chan<- any) {
 	defer l.wg.Done()
 	defer l.listener.Close()
 
@@ -122,7 +136,7 @@ func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, e
 				continue
 			}
 
-			eventChan <- NewSessionEvent{Session: session}
+			eventChan <- SessionConnectedEvent{Session: session}
 		}
 	}
 }

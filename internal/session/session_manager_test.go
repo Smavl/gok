@@ -1,14 +1,26 @@
-package main
+package session
 
 import (
 	"io"
 	"net"
 	"testing"
+
+	"github.com/smavl/gok/internal/misc"
+	"github.com/smavl/gok/internal/prober"
 )
 
+type FakeDisplay struct{}
+
+func (d *FakeDisplay) Write(b []byte) (int, error) {
+	return len(b), nil
+}
+
+func NewFakeDisplay() *FakeDisplay {
+	return &FakeDisplay{}
+}
 
 func newTestSessionManager() *SessionManager {
-	return NewSessionManager(ProberOptions{})
+	return NewSessionManager(prober.ProberOptions{})
 }
 
 func TestIdIncrement(t *testing.T) {
@@ -31,7 +43,7 @@ func TestGetNon_existentSession(t *testing.T) {
 		session, err := sm.Get(i)
 		// session, err := sm.Get(42)
 
-		want := ErrSessionNotFound 
+		want := misc.ErrSessionNotFound 
 
 		// TEST: check that error is returned
 		if err == nil {

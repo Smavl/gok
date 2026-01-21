@@ -1,23 +1,26 @@
-package main
+package core
 
 import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/smavl/gok/internal/session"
+	"github.com/smavl/gok/internal/terminal"
 )
 
 type CommandHandler struct {
-	sessions  *SessionManager
-	listeners *ShellListenerManager
-	terminal  TerminalController
-	shellMode *RawShellMode
+	sessions  *session.SessionManager
+	listeners *session.ShellListenerManager
+	terminal  terminal.TerminalController
+	shellMode *terminal.RawShellMode
 }
 
-func NewCommandHandler(sessions *SessionManager, listeners *ShellListenerManager, terminal TerminalController, shellMode *RawShellMode) *CommandHandler {
+func NewCommandHandler(sessions *session.SessionManager, listeners *session.ShellListenerManager, term terminal.TerminalController, shellMode *terminal.RawShellMode) *CommandHandler {
 	return &CommandHandler{
 		sessions:  sessions,
 		listeners: listeners,
-		terminal:  terminal,
+		terminal:  term,
 		shellMode: shellMode,
 	}
 }

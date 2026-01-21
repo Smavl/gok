@@ -1,4 +1,4 @@
-package main
+package terminal
 
 import (
 	"context"
@@ -10,7 +10,7 @@ type InputManagerImpl struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	reader  InputReader
-	eventCh chan<- Event
+	eventCh chan<- any
 	wg      sync.WaitGroup
 }
 
@@ -21,7 +21,7 @@ type InputManager interface {
 	SwapReader(reader InputReader)
 }
 
-func NewInputManager(initialInputRead InputReader, evenCh chan<- Event) *InputManagerImpl {
+func NewInputManager(initialInputRead InputReader, evenCh chan<- any) *InputManagerImpl {
 	return &InputManagerImpl{
 		reader:  initialInputRead,
 		eventCh: evenCh,
