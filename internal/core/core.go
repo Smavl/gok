@@ -9,13 +9,12 @@ import (
 	"syscall"
 
 	"github.com/smavl/gok/internal/cli"
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/event"
 	"github.com/smavl/gok/internal/prober"
 	"github.com/smavl/gok/internal/session"
 	"github.com/smavl/gok/internal/terminal"
 )
-
-
 
 // TODO: Move elsewhere
 const (
@@ -37,7 +36,7 @@ type Core struct {
 	// Handlers
 	commander *CommandHandler
 	shellMode *terminal.RawShellMode
-	terminal  terminal.TerminalController
+	terminal  domain.TerminalController
 
 	// event
 	eventBus *event.EventBus
@@ -51,7 +50,7 @@ type Core struct {
 func NewCore(cfg cli.Config) *Core {
 	terminalDisplay := terminal.NewTerminalDisplay()
 
-	var term terminal.TerminalController
+	var term domain.TerminalController
 	var err error
 
 	// Hacky headless switch

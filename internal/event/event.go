@@ -22,7 +22,7 @@ type EventBus struct {
 
 func NewEventBus() *EventBus {
 	return &EventBus{
-		// FIX: what is `100` magic number?
+		// TODO: what is `100` magic number? and what should it be?
 		Session: make(chan NewSessionEvent, 100),
 		Shell:   make(chan ShellByteEvent, 100),
 		Menu:    make(chan MenuCmdEvent, 100),

@@ -3,30 +3,23 @@ package terminal
 import (
 	"sync"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/event"
-	"github.com/smavl/gok/internal/session"
 )
-
-
-type SessionInterface interface {
-	Foreground()
-	Background()
-	Write([]byte) (int, error)
-}
 
 type RawShellMode struct {
 	mu            sync.Mutex
 	activeShellID int
 
-	currentSession *session.Session
+	currentSession domain.Session
 
 	im       *InputManagerImpl
-	terminal TerminalController
+	terminal domain.TerminalController
 	shellCh  chan<- event.ShellByteEvent
 	menuCh   chan<- event.MenuCmdEvent
 }
 
-func NewRawShellMode(inputMan *InputManagerImpl, terminal TerminalController, shellCh chan<- event.ShellByteEvent, menuCh chan<- event.MenuCmdEvent) *RawShellMode {
+func NewRawShellMode(inputMan *InputManagerImpl, terminal domain.TerminalController, shellCh chan<- event.ShellByteEvent, menuCh chan<- event.MenuCmdEvent) *RawShellMode {
 	return &RawShellMode{
 		im:       inputMan,
 		terminal: terminal,
@@ -35,17 +28,17 @@ func NewRawShellMode(inputMan *InputManagerImpl, terminal TerminalController, sh
 	}
 }
 
-func (m *RawShellMode) Enter(session *session.Session) {
-	ID := session.GetID()
+func (m *RawShellMode) Enter(s domain.Session) {
+	ID := s.GetID()
 
 	m.terminal.Message("[*] Session #%v: Dropping into shell..\n", ID)
 	m.activeShellID = ID
-	m.currentSession = session
+	m.currentSession = s
 
 	m.terminal.SetRaw()
-	session.Foreground()
+	s.Foreground()
 	m.im.SwapReader(NewByteReader(m.shellCh))
-	session.Write([]byte{'\n'})
+	s.Write([]byte{'\n'})
 }
 
 func (m *RawShellMode) GetActiveSessionId() int {

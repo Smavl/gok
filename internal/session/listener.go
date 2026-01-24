@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/smavl/gok/internal/cli"
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/event"
 )
 
@@ -21,11 +22,6 @@ type Listener struct {
 	wg       sync.WaitGroup
 }
 
-type TerminalController interface {
-	Message(format string, a ...any)
-	Write([]byte) (int, error)
-}
-
 type ListenerManager interface {
 	Init(config cli.Config)
 	Start(addr string, port int) (*Listener, error)
@@ -35,12 +31,12 @@ type ListenerManager interface {
 type ShellListenerManager struct {
 	mu             sync.RWMutex
 	listeners      map[string]*Listener
-	terminal       TerminalController
+	terminal       domain.TerminalController
 	sessionManager *SessionManager
 	eventChan      chan <- event.NewSessionEvent
 }
 
-func NewShellListenerManager(sm *SessionManager, terminal TerminalController, eventChan chan<- event.NewSessionEvent) *ShellListenerManager {
+func NewShellListenerManager(sm *SessionManager, terminal domain.TerminalController, eventChan chan<- event.NewSessionEvent) *ShellListenerManager {
 	return &ShellListenerManager{
 		listeners:      make(map[string]*Listener),
 		sessionManager: sm,
@@ -103,7 +99,7 @@ func (lm *ShellListenerManager) Start(ctx context.Context, addr string, port int
 
 	return l, nil
 }
-func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, eventChan chan<- event.NewSessionEvent) {
+func (l *Listener) acceptLoop(sm *SessionManager, terminal domain.TerminalController, eventChan chan<- event.NewSessionEvent) {
 	defer l.wg.Done()
 	defer l.listener.Close()
 

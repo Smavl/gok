@@ -5,17 +5,10 @@ import (
 	"os"
 	"sync"
 
+	"github.com/smavl/gok/internal/domain"
 	"golang.org/x/term"
 )
 
-type TerminalController interface {
-	SetRaw()
-	Restore()
-	Write(b []byte) (int, error)
-	Message(format string, args ...any)
-	Prompt()
-	ShowError(err error)
-}
 
 type Terminal struct {
 	mu         sync.Mutex
@@ -30,7 +23,7 @@ type HeadlessTerminal struct {
 	// savedState *term.State
 }
 
-func NewTerminal(display Display) (TerminalController, error) {
+func NewTerminal(display Display) (domain.TerminalController, error) {
 	state, err := term.GetState(int(os.Stdin.Fd()))
 	if err != nil {
 		return nil, err
@@ -98,7 +91,7 @@ func (t *Terminal) ShowError(err error) {
 }
 
 
-func NewHeadlessTerminal(display Display) (TerminalController, error) {
+func NewHeadlessTerminal(display Display) (domain.TerminalController, error) {
 	return &HeadlessTerminal{
 		display:    display,
 		// savedState: nil,

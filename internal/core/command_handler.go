@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/session"
 	"github.com/smavl/gok/internal/terminal"
 )
@@ -12,11 +13,11 @@ import (
 type CommandHandler struct {
 	sessions  *session.SessionManager
 	listeners *session.ShellListenerManager
-	terminal  terminal.TerminalController
+	terminal  domain.TerminalController
 	shellMode *terminal.RawShellMode
 }
 
-func NewCommandHandler(sessions *session.SessionManager, listeners *session.ShellListenerManager, term terminal.TerminalController, shellMode *terminal.RawShellMode) *CommandHandler {
+func NewCommandHandler(sessions *session.SessionManager, listeners *session.ShellListenerManager, term domain.TerminalController, shellMode *terminal.RawShellMode) *CommandHandler {
 	return &CommandHandler{
 		sessions:  sessions,
 		listeners: listeners,
@@ -59,7 +60,6 @@ func (ch *CommandHandler) interact(args []string) {
 			return
 		}
 
-		// sessionExists := ch.sessions.Exists(id)
 		session, err := ch.sessions.Get(id)
 
 		if err == nil {

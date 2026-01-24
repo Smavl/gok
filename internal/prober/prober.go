@@ -12,7 +12,7 @@ import (
 	"github.com/smavl/gok/internal/misc"
 )
 
-// SessionInterface defines the minimal interface that prober needs from a session
+// SessionInterface defines the minimal interface of functions that prober needs from a session
 type SessionInterface interface {
 	Write([]byte) (int, error)
 	GetProbingLines() []string
@@ -205,7 +205,7 @@ func getExitCode(output []string, delimiter string) (BashExitCode, error) {
 
 	// Check if delimiter was found and there's a line before it
 	if !delimiterFound {
-		return 0, fmt.Errorf("delimiter not found in output")
+		return 0, fmt.Errorf("delimiter not found in output!")
 	}
 	if idxDelim == 0 {
 		return 0, fmt.Errorf("no exit code line before delimiter")
