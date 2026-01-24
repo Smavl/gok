@@ -1,4 +1,4 @@
-package main
+package session
 
 import (
 	"context"
@@ -8,6 +8,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/smavl/gok/internal/misc"
+	"github.com/smavl/gok/internal/prober"
 )
 
 type SessionState int
@@ -68,40 +71,48 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 }
 
 type SystemInfo struct {
-	OS	OS
+	OS prober.OS
 }
 
 type Session struct {
-	ID					int
-	conn 		 		net.Conn
-	Addr 		 		string
+	ID   int
+	conn net.Conn
+	Addr string
 
-	mu           		sync.Mutex
-	state        		SessionState
-	display		 		io.Writer
-	history      		*HistoryLineBuffer
+	mu      sync.Mutex
+	state   SessionState
+	display io.Writer
+	history *HistoryLineBuffer
 
 	// probing
-	probingBuffer		*HistoryLineBuffer
-	probinDataArrived	chan struct{}
+	probingBuffer      *HistoryLineBuffer
+	probingDataArrived chan struct{}
+	SystemInfo         SystemInfo
+	Prober             prober.Prober
+	probeOpts          prober.ProberOptions
 
-	SystemInfo			SystemInfo
 	// context things
-	ctx					context.Context
-	cancel 		 		context.CancelFunc
-	wg     		 		sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+}
+
+func (s *Session) GetID() int {
+	return s.ID
 }
 
 type SessionManager struct {
 	mu        sync.RWMutex
 	currentID int
 	sessions  map[int]*Session
+	probeOpts prober.ProberOptions
 }
 
-func NewSessionManager() *SessionManager {
+func NewSessionManager(probeOpts prober.ProberOptions) *SessionManager {
 	return &SessionManager{
 		currentID: 0,
 		sessions:  make(map[int]*Session),
+		probeOpts: probeOpts,
 	}
 }
 
@@ -115,14 +126,15 @@ func (sm *SessionManager) incID() int {
 
 func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session, error) {
 	session := Session{
-		ID:					sm.incID(),
-		conn:    			conn,
-		Addr:    			conn.RemoteAddr().String(),
-		display: 			display,
-		history: 			CreateLineBuffer(defaultHistoryMaxLines),
-		probingBuffer:		CreateLineBuffer(defaultHistoryMaxLines),
-		probinDataArrived:	make(chan struct{}),
-		SystemInfo: SystemInfo{},
+		ID:                sm.incID(),
+		conn:              conn,
+		Addr:              conn.RemoteAddr().String(),
+		display:           display,
+		history:           CreateLineBuffer(defaultHistoryMaxLines),
+		probingBuffer:     CreateLineBuffer(defaultHistoryMaxLines),
+		probingDataArrived: make(chan struct{}),
+		SystemInfo:        SystemInfo{},
+		probeOpts:         sm.probeOpts,
 	}
 
 	sm.mu.Lock()
@@ -136,7 +148,7 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 	return &session, nil
 }
 
-func (sm *SessionManager) GetAmount() int {
+func (sm *SessionManager) GetAmountOfSessions() int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	return len(sm.sessions)
@@ -165,11 +177,12 @@ func (sm *SessionManager) Get(ID int) (*Session, error) {
 	defer sm.mu.RUnlock()
 	sesh, ok := sm.sessions[ID]
 	if !ok {
-		return nil, ErrSessionNotFound
+		return nil, misc.ErrSessionNotFound
 	}
 
 	return sesh, nil
 }
+
 
 // At this point the shell has landed
 func (s *Session) Start(ctx context.Context) error {
@@ -181,25 +194,38 @@ func (s *Session) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.outputLoop()
 
-	// NOTE: probing session has to happend after outputLoop is initialized
+	// NOTE: probing session has to happen after outputLoop is initialized
 	s.probeSession()
 	return nil
 }
 
 func (s *Session) probeSession() error {
-	// get os 
-	rcmds := RandomCommandStrategy{}	
+	s.mu.Lock()
+	s.state = StateProbing
+	s.mu.Unlock()
+
+	// get os
+	rcmds := prober.RandomCommandStrategy{CmdTimeout: s.probeOpts.CmdTimeout}
 	OS, err := rcmds.DetermineOS(s)
 	if err != nil {
 		return err
 	}
 	s.SystemInfo.OS = OS
-	// TEST: print for debug
-	s.display.Write([]byte(fmt.Sprintf("Detected OS: %v\n", s.SystemInfo.OS)))
-
 
 	// Fetch binaries
-	//  binaries
+	prober, err := OS.GetNewProber(s, s.probeOpts)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.Prober = prober
+	s.mu.Unlock()
+
+	prober.EnumerateBinaries()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state = StateBackgrounded
 
 	return nil
 }
@@ -210,6 +236,16 @@ func (s *Session) GetProbingLines() []string {
 	return s.probingBuffer.lines
 }
 
+func (s *Session) GetProbingDataChannel() <-chan struct{} {
+	return s.probingDataArrived
+}
+
+func (s *Session) IsProberDone() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state == StateBackgrounded && s.Prober != nil
+}
+
 func (s *Session) ClearProbingBuffer() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -217,7 +253,6 @@ func (s *Session) ClearProbingBuffer() {
 	s.probingBuffer.lines = nil
 	s.probingBuffer.partialBuf = ""
 }
-
 
 func (s *Session) outputLoop() {
 	defer s.wg.Done()
@@ -271,11 +306,13 @@ func (s *Session) outputLoop() {
 			//
 			case StateProbing:
 				s.probingBuffer.Feed(data)
-				// signal that probing data is incomming
+				s.mu.Unlock()
+				// signal that probing data is incomming (after releasing lock to avoid blocking)
 				select {
-				case s.probinDataArrived <- struct{}{}:
+				case s.probingDataArrived <- struct{}{}:
 				default:
 				}
+				continue
 			case StateDead:
 				s.mu.Unlock()
 				return
@@ -285,14 +322,12 @@ func (s *Session) outputLoop() {
 	}
 }
 
-
-
 // send data to the remote session
 func (s *Session) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.state == StateDead {
-		return 0, ErrSessionDed
+		return 0, misc.ErrSessionDed
 	}
 	return s.conn.Write(p)
 }
@@ -335,4 +370,3 @@ func (s *Session) Stop() {
 	s.wg.Wait()
 	s.conn.Close()
 }
-

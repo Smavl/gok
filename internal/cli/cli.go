@@ -1,9 +1,10 @@
-package main
+package cli
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
 )
@@ -11,15 +12,30 @@ import (
 var Flags struct {
 	PortRange PortRange `help:"Ports to listen on" default:"9001" short:"p"`
 	BoundIPs  []string  `help:"IPs to bind the listeners on" default:"[0.0.0.0]" short:"b"`
+	// timeout flags
+	ProbingCmdTimeout time.Duration `help:"Timeout for probing commands" default:"200ms" short:"t"`
 }
 
 type Config struct {
-	bindIps   []string
-	PortRange PortRange
+	BindIps           []string
+	PortRange         PortRange
+	ProbingCmdTimeout time.Duration
+	// TODO: testmode/headless mode
+	HeadlessMode bool
 }
 
 type PortRange struct {
 	Ports []int
+}
+
+func isValidPort(port int) bool {
+	minValidPort := 1
+	maxValidPort := 65535
+
+	if port < minValidPort {return false}
+	if port > maxValidPort {return false}
+
+	return true
 }
 
 // Custom parsing
@@ -57,11 +73,18 @@ func (p *PortRange) Decode(ctx *kong.DecodeContext) error {
 		p.Ports = make([]int, count)
 
 		for i := range p.Ports {
-			p.Ports[i] = start + i
+			currentPort := start + i
+			if !isValidPort(currentPort) {
+				return fmt.Errorf("Invalid port in range: %d", currentPort)
+			}
+			p.Ports[i] = currentPort
 		}
 	} else {
 		// single port
 		port, err := strconv.Atoi(value)
+		if !isValidPort(port) {
+			return fmt.Errorf("Invalid port in range: %d", port)
+		}
 		if err != nil {
 			return fmt.Errorf("Invalid port value: %v", err)
 		}

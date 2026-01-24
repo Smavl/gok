@@ -1,4 +1,4 @@
-package main
+package session
 
 import (
 	"context"
@@ -7,6 +7,10 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/smavl/gok/internal/cli"
+	"github.com/smavl/gok/internal/domain"
+	"github.com/smavl/gok/internal/event"
 )
 
 type Listener struct {
@@ -19,7 +23,7 @@ type Listener struct {
 }
 
 type ListenerManager interface {
-	Init(config Config)
+	Init(config cli.Config)
 	Start(addr string, port int) (*Listener, error)
 	GetAddresses() []string
 }
@@ -27,12 +31,12 @@ type ListenerManager interface {
 type ShellListenerManager struct {
 	mu             sync.RWMutex
 	listeners      map[string]*Listener
-	terminal       *Terminal
+	terminal       domain.TerminalController
 	sessionManager *SessionManager
-	eventChan      chan<- Event
+	eventChan      chan <- event.NewSessionEvent
 }
 
-func NewShellListenerManager(sm *SessionManager, terminal *Terminal, eventChan chan<- Event) *ShellListenerManager {
+func NewShellListenerManager(sm *SessionManager, terminal domain.TerminalController, eventChan chan<- event.NewSessionEvent) *ShellListenerManager {
 	return &ShellListenerManager{
 		listeners:      make(map[string]*Listener),
 		sessionManager: sm,
@@ -41,10 +45,10 @@ func NewShellListenerManager(sm *SessionManager, terminal *Terminal, eventChan c
 	}
 }
 
-func (lm *ShellListenerManager) Init(ctx context.Context, config Config) {
+func (lm *ShellListenerManager) Init(ctx context.Context, config cli.Config) {
 	lm.terminal.Message("[+] Initializing listeners:\n\t")
 
-	for _, addr := range config.bindIps {
+	for _, addr := range config.BindIps {
 		for _, port := range config.PortRange.Ports {
 			lm.terminal.Message("%s:%d ", addr, port)
 
@@ -95,7 +99,7 @@ func (lm *ShellListenerManager) Start(ctx context.Context, addr string, port int
 
 	return l, nil
 }
-func (l *Listener) acceptLoop(sm *SessionManager, terminal *Terminal, eventChan chan<- Event) {
+func (l *Listener) acceptLoop(sm *SessionManager, terminal domain.TerminalController, eventChan chan<- event.NewSessionEvent) {
 	defer l.wg.Done()
 	defer l.listener.Close()
 
@@ -122,7 +126,11 @@ func (l *Listener) acceptLoop(sm *SessionManager, terminal *Terminal, eventChan 
 				continue
 			}
 
-			eventChan <- NewSessionEvent{Session: session}
+			eventChan <- event.NewSessionEvent{
+				SessionID:   session.ID,
+				SessionAddr: session.Addr,
+				SystemOS:    session.SystemInfo.OS.String(),
+			}
 		}
 	}
 }

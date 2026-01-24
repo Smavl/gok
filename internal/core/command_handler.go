@@ -1,29 +1,33 @@
-package main
+package core
 
 import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/smavl/gok/internal/domain"
+	"github.com/smavl/gok/internal/session"
+	"github.com/smavl/gok/internal/terminal"
 )
 
 type CommandHandler struct {
-	sessions  *SessionManager
-	listeners *ShellListenerManager
-	terminal  *Terminal
-	shellMode *RawShellMode
+	sessions  *session.SessionManager
+	listeners *session.ShellListenerManager
+	terminal  domain.TerminalController
+	shellMode *terminal.RawShellMode
 }
 
-func NewCommandHandler(sessions *SessionManager, listeners *ShellListenerManager, terminal *Terminal, shellMode *RawShellMode) *CommandHandler {
+func NewCommandHandler(sessions *session.SessionManager, listeners *session.ShellListenerManager, term domain.TerminalController, shellMode *terminal.RawShellMode) *CommandHandler {
 	return &CommandHandler{
 		sessions:  sessions,
 		listeners: listeners,
-		terminal:  terminal,
+		terminal:  term,
 		shellMode: shellMode,
 	}
 }
 
 func (ch *CommandHandler) listSessions() {
-	if ch.sessions.GetAmount() == 0 {
+	if ch.sessions.GetAmountOfSessions() == 0 {
 		ch.terminal.Message("\n[!] No active sessions\n")
 	} else {
 		ch.terminal.Message("\nActive Sessions:\n")
@@ -56,10 +60,10 @@ func (ch *CommandHandler) interact(args []string) {
 			return
 		}
 
-		sessionExists := ch.sessions.Exists(id)
+		session, err := ch.sessions.Get(id)
 
-		if sessionExists {
-			ch.shellMode.Enter(id)
+		if err == nil {
+			ch.shellMode.Enter(session)
 		} else {
 			ch.terminal.Message("Session #%d not found\n", id)
 			ch.terminal.Prompt()
@@ -94,7 +98,15 @@ func (ch *CommandHandler) killSession(args []string) {
 }
 
 func (ch *CommandHandler) showHelp() {
-	panic("unimplemented")
+	helpText := `Available Commands:
+  listeners, lis, l         - List all active listeners
+  sessions, sesh, sess, s   - List all active sessions
+  interact, int, i <id>     - Interact with a session
+  kill, k <id>              - Kill a session
+  help, h                   - Show this help message
+  exit, quit, q             - Exit the application
+`
+	ch.terminal.Message("%s", helpText)
 }
 
 func (ch *CommandHandler) Execute(input string) {
@@ -123,14 +135,14 @@ func (ch *CommandHandler) Execute(input string) {
 	case "help", "h":
 		ch.showHelp()
 
-	case "exit", "quit":
+	case "exit", "quit", "q":
 		os.Exit(0)
 
 	default:
 		// TODO: Add help suggestion
 		ch.terminal.Message("[!] Unknown command: %s\n", subCmd)
+		ch.terminal.Message(`[+] Type "help" to see available commands.`)
 	}
 
 	ch.terminal.Prompt()
 }
-
