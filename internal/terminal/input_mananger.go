@@ -3,8 +3,6 @@ package terminal
 import (
 	"context"
 	"sync"
-
-	"github.com/smavl/gok/internal/event"
 )
 
 type InputManagerImpl struct {
@@ -13,9 +11,6 @@ type InputManagerImpl struct {
 	cancel  context.CancelFunc
 	reader  InputReader
 	wg      sync.WaitGroup
-	// Event channels
-	shellChan chan<- event.ShellByteEvent
-	menuChan  chan<- event.MenuCmdEvent
 }
 
 type InputManager interface {
@@ -25,12 +20,9 @@ type InputManager interface {
 	SwapReader(reader InputReader)
 }
 
-// func NewInputManager(initialInputRead InputReader, evenCh chan<- event.Event) *InputManagerImpl {
-func NewInputManager(initialInputRead InputReader, shellCh chan<- event.ShellByteEvent, menuCh chan<- event.MenuCmdEvent) *InputManagerImpl {
+func NewInputManager(initialInputRead InputReader) *InputManagerImpl {
 	return &InputManagerImpl{
-		reader:  initialInputRead,
-		shellChan: shellCh,
-		menuChan:  menuCh,
+		reader: initialInputRead,
 	}
 }
 
@@ -68,26 +60,8 @@ func (im *InputManagerImpl) run() {
 			// exits function (and wg.Done is called)
 			return
 		default:
-			// Read event from InputReader
-			val := im.reader.Read()
-
-			// WARN: Dirty type cast
-			switch e := val.(type) {
-			case event.ShellByteEvent:
-				// send to shell channel
-				select {
-				case im.shellChan <- e:
-				case <-im.ctx.Done(): return
-				}
-			case event.MenuCmdEvent:
-				// send to menu channel
-				select {
-				case im.menuChan <- e:
-				case <-im.ctx.Done(): return
-				}
-			default:
-				// unknown event type, ignore
-			}
+			// Read event from InputReader (reader dispatches internally)
+			_ = im.reader.Read()
 		}
 	}
 }

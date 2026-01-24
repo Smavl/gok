@@ -24,14 +24,6 @@ const (
 	CtrlL = 0x0C // Clear screen
 )
 
-// sessionManagerAdapter adapts session.SessionManager to terminal.SessionManager interface
-type sessionManagerAdapter struct {
-	sm *session.SessionManager
-}
-
-func (sma *sessionManagerAdapter) Get(id int) (any, error) {
-	return sma.sm.Get(id)
-}
 
 type Core struct {
 	mu     sync.RWMutex
@@ -74,16 +66,14 @@ func NewCore(cfg cli.Config) *Core {
 		os.Exit(1)
 	}
 
-	// eventChan := make(chan event.Event)
 	eventBus := event.NewEventBus()
-	inputMan := terminal.NewInputManager(terminal.NewLineReader(), eventBus.Shell, eventBus.Menu)
+	inputMan := terminal.NewInputManager(terminal.NewLineReader(eventBus.Menu))
 	sm := session.NewSessionManager(prober.ProberOptions{
 		CmdTimeout: cfg.ProbingCmdTimeout,
 	})
 	slm := session.NewShellListenerManager(sm, term, eventBus.Session)
 	// Create adapter for terminal.SessionManager interface
-	smAdapter := &sessionManagerAdapter{sm: sm}
-	shellMode := terminal.NewRawShellMode(smAdapter, inputMan, term)
+	shellMode := terminal.NewRawShellMode(inputMan, term, eventBus.Shell, eventBus.Menu)
 
 	core := &Core{
 		Config:               cfg,

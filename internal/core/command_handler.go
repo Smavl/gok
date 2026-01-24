@@ -59,10 +59,11 @@ func (ch *CommandHandler) interact(args []string) {
 			return
 		}
 
-		sessionExists := ch.sessions.Exists(id)
+		// sessionExists := ch.sessions.Exists(id)
+		session, err := ch.sessions.Get(id)
 
-		if sessionExists {
-			ch.shellMode.Enter(id)
+		if err == nil {
+			ch.shellMode.Enter(session)
 		} else {
 			ch.terminal.Message("Session #%d not found\n", id)
 			ch.terminal.Prompt()

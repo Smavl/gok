@@ -1,10 +1,10 @@
 package terminal
 
 import (
-	"errors"
 	"sync"
 
-	"github.com/smavl/gok/internal/misc"
+	"github.com/smavl/gok/internal/event"
+	"github.com/smavl/gok/internal/session"
 )
 
 
@@ -14,75 +14,56 @@ type SessionInterface interface {
 	Write([]byte) (int, error)
 }
 
-type SessionManager interface {
-	Get(id int) (any, error)
-}
-
-// type ShellMode interface {
-// 	Enter(ID int)
-// 	Exit()
-// }
-
 type RawShellMode struct {
 	mu            sync.Mutex
 	activeShellID int
 
-	sm       SessionManager
+	currentSession *session.Session
+
 	im       *InputManagerImpl
 	terminal TerminalController
+	shellCh  chan<- event.ShellByteEvent
+	menuCh   chan<- event.MenuCmdEvent
 }
 
-func NewRawShellMode(sessionMan SessionManager, inputMan *InputManagerImpl, terminal TerminalController) *RawShellMode {
+func NewRawShellMode(inputMan *InputManagerImpl, terminal TerminalController, shellCh chan<- event.ShellByteEvent, menuCh chan<- event.MenuCmdEvent) *RawShellMode {
 	return &RawShellMode{
-		sm:       sessionMan,
 		im:       inputMan,
 		terminal: terminal,
+		shellCh:  shellCh,
+		menuCh:   menuCh,
 	}
 }
 
-func (m *RawShellMode) Enter(ID int) {
-	sessionAny, err := m.sm.Get(ID)
-	if err != nil {
-		if errors.Is(err, misc.ErrSessionNotFound) {
-			m.terminal.ShowError(err)
-		}
-		m.terminal.Message("[!] Error: Session #%d not found\n", ID)
-		m.terminal.Prompt()
-		return
-	}
-
-	session, ok := sessionAny.(SessionInterface)
-	if !ok {
-		m.terminal.Message("[!] Error: Invalid session type\n")
-		m.terminal.Prompt()
-		return
-	}
+func (m *RawShellMode) Enter(session *session.Session) {
+	ID := session.GetID()
 
 	m.terminal.Message("[*] Session #%v: Dropping into shell..\n", ID)
 	m.activeShellID = ID
+	m.currentSession = session
 
 	m.terminal.SetRaw()
 	session.Foreground()
-	m.im.SwapReader(NewByteReader())
+	m.im.SwapReader(NewByteReader(m.shellCh))
 	session.Write([]byte{'\n'})
 }
+
 func (m *RawShellMode) GetActiveSessionId() int {
 	return m.activeShellID
 }
 
 func (m *RawShellMode) Exit() {
-	sessionAny, err := m.sm.Get(m.GetActiveSessionId())
-	if err != nil {
-		// Unexpcted but do restore terminal anyway
-		m.terminal.Message("\r\n[!] Warning: Session no longer exists\r\n")
-	} else if session, ok := sessionAny.(SessionInterface); ok {
-		session.Background()
-	}
+	// Get current session
+	session := m.currentSession
 
+	// background
+	session.Background()
+
+	// restore the user terminal
 	m.terminal.Restore()
 	m.terminal.Message("\n[*] Returning to main menu\n")
 
 	// Swap back to line reader
-	m.im.SwapReader(NewLineReader())
+	m.im.SwapReader(NewLineReader(m.menuCh))
 	defer m.terminal.Prompt()
 }

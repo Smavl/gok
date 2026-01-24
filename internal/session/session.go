@@ -97,6 +97,10 @@ type Session struct {
 	wg     sync.WaitGroup
 }
 
+func (s *Session) GetID() int {
+	return s.ID
+}
+
 type SessionManager struct {
 	mu        sync.RWMutex
 	currentID int
