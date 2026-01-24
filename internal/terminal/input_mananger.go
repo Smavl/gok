@@ -13,8 +13,7 @@ type InputManagerImpl struct {
 	cancel  context.CancelFunc
 	reader  InputReader
 	wg      sync.WaitGroup
-	// even channelse
-	// eventCh chan<- event.Event
+	// Event channels
 	shellChan chan<- event.ShellByteEvent
 	menuChan  chan<- event.MenuCmdEvent
 }
@@ -58,6 +57,7 @@ func (im *InputManagerImpl) Stop() {
 	im.wg.Wait()
 }
 
+// TODO: Error handling?
 // Run loop
 func (im *InputManagerImpl) run() {
 	// signal to WaitGroup when done

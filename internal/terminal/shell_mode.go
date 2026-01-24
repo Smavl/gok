@@ -3,10 +3,10 @@ package terminal
 import (
 	"errors"
 	"sync"
+
+	"github.com/smavl/gok/internal/misc"
 )
 
-// Minimal interfaces to avoid circular dependency with session package
-var ErrSessionNotFound = errors.New("Session not found")
 
 type SessionInterface interface {
 	Foreground()
@@ -43,7 +43,7 @@ func NewRawShellMode(sessionMan SessionManager, inputMan *InputManagerImpl, term
 func (m *RawShellMode) Enter(ID int) {
 	sessionAny, err := m.sm.Get(ID)
 	if err != nil {
-		if errors.Is(err, ErrSessionNotFound) {
+		if errors.Is(err, misc.ErrSessionNotFound) {
 			m.terminal.ShowError(err)
 		}
 		m.terminal.Message("[!] Error: Session #%d not found\n", ID)

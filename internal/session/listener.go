@@ -21,15 +21,10 @@ type Listener struct {
 	wg       sync.WaitGroup
 }
 
-// TerminalController is a minimal interface to avoid circular imports
 type TerminalController interface {
 	Message(format string, a ...any)
 	Write([]byte) (int, error)
 }
-
-// type SessionConnectedEvent struct {
-// 	Session *Session
-// }
 
 type ListenerManager interface {
 	Init(config cli.Config)

@@ -2,16 +2,9 @@ package terminal
 
 import (
 	"os"
+
+	"github.com/smavl/gok/internal/event"
 )
-
-// Event types that terminal produces
-type ShellByteEvent struct {
-	Byte byte
-}
-
-type MenuCmdEvent struct {
-	Input string
-}
 
 type InputReader interface {
 	Read() any
@@ -38,7 +31,7 @@ func (r *LineReader) Read() any {
 	if r.buf[0] == '\n' {
 		line := string(r.lineBuffer)
 		r.lineBuffer = []byte{}
-		return MenuCmdEvent{Input: line}
+		return event.MenuCmdEvent{Input: line}
 	} else if r.buf[0] != '\r' { // Ignore carriage returns
 		r.lineBuffer = append(r.lineBuffer, r.buf[0])
 	}
@@ -58,5 +51,5 @@ func (r *ByteReader) Read() any {
 	if err != nil || n == 0 {
 		return nil
 	}
-	return ShellByteEvent{Byte: r.buf[0]}
+	return event.ShellByteEvent{Byte: r.buf[0]}
 }
