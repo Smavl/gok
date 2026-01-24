@@ -42,7 +42,7 @@ type Core struct {
 	// event
 	eventBus *event.EventBus
 
-	// eventChan chan event.Event
+	// Context things
 	ctx       context.Context
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
@@ -72,7 +72,6 @@ func NewCore(cfg cli.Config) *Core {
 		CmdTimeout: cfg.ProbingCmdTimeout,
 	})
 	slm := session.NewShellListenerManager(sm, term, eventBus.Session)
-	// Create adapter for terminal.SessionManager interface
 	shellMode := terminal.NewRawShellMode(inputMan, term, eventBus.Shell, eventBus.Menu)
 
 	core := &Core{

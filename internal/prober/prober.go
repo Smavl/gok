@@ -13,7 +13,6 @@ import (
 )
 
 // SessionInterface defines the minimal interface that prober needs from a session
-// This avoids circular dependency with the session package
 type SessionInterface interface {
 	Write([]byte) (int, error)
 	GetProbingLines() []string
