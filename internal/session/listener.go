@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/smavl/gok/internal/cli"
+	"github.com/smavl/gok/internal/event"
 )
 
 type Listener struct {
@@ -26,11 +27,9 @@ type TerminalController interface {
 	Write([]byte) (int, error)
 }
 
-// SessionConnectedEvent is sent when a new session connects
-// It's defined here to avoid circular imports with core
-type SessionConnectedEvent struct {
-	Session *Session
-}
+// type SessionConnectedEvent struct {
+// 	Session *Session
+// }
 
 type ListenerManager interface {
 	Init(config cli.Config)
@@ -43,10 +42,10 @@ type ShellListenerManager struct {
 	listeners      map[string]*Listener
 	terminal       TerminalController
 	sessionManager *SessionManager
-	eventChan      chan<- any // Use any to avoid importing core
+	eventChan      chan <- event.NewSessionEvent
 }
 
-func NewShellListenerManager(sm *SessionManager, terminal TerminalController, eventChan chan<- any) *ShellListenerManager {
+func NewShellListenerManager(sm *SessionManager, terminal TerminalController, eventChan chan<- event.NewSessionEvent) *ShellListenerManager {
 	return &ShellListenerManager{
 		listeners:      make(map[string]*Listener),
 		sessionManager: sm,
@@ -109,7 +108,7 @@ func (lm *ShellListenerManager) Start(ctx context.Context, addr string, port int
 
 	return l, nil
 }
-func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, eventChan chan<- any) {
+func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, eventChan chan<- event.NewSessionEvent) {
 	defer l.wg.Done()
 	defer l.listener.Close()
 
@@ -136,7 +135,11 @@ func (l *Listener) acceptLoop(sm *SessionManager, terminal TerminalController, e
 				continue
 			}
 
-			eventChan <- SessionConnectedEvent{Session: session}
+			eventChan <- event.NewSessionEvent{
+				SessionID:   session.ID,
+				SessionAddr: session.Addr,
+				SystemOS:    session.SystemInfo.OS.String(),
+			}
 		}
 	}
 }

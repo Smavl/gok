@@ -9,9 +9,19 @@ import (
 	"syscall"
 
 	"github.com/smavl/gok/internal/cli"
+	"github.com/smavl/gok/internal/event"
 	"github.com/smavl/gok/internal/prober"
 	"github.com/smavl/gok/internal/session"
 	"github.com/smavl/gok/internal/terminal"
+)
+
+
+
+// TODO: Move elsewhere
+const (
+	CtrlD = 0x04 // Exit shell
+	CtrlC = 0x03 // Interrupt
+	CtrlL = 0x0C // Clear screen
 )
 
 // sessionManagerAdapter adapts session.SessionManager to terminal.SessionManager interface
@@ -38,7 +48,9 @@ type Core struct {
 	terminal  terminal.TerminalController
 
 	// event
-	eventChan chan any
+	eventBus *event.EventBus
+
+	// eventChan chan event.Event
 	ctx       context.Context
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
@@ -62,12 +74,13 @@ func NewCore(cfg cli.Config) *Core {
 		os.Exit(1)
 	}
 
-	eventChan := make(chan any)
-	inputMan := terminal.NewInputManager(terminal.NewLineReader(), eventChan)
+	// eventChan := make(chan event.Event)
+	eventBus := event.NewEventBus()
+	inputMan := terminal.NewInputManager(terminal.NewLineReader(), eventBus.Shell, eventBus.Menu)
 	sm := session.NewSessionManager(prober.ProberOptions{
 		CmdTimeout: cfg.ProbingCmdTimeout,
 	})
-	slm := session.NewShellListenerManager(sm, term, eventChan)
+	slm := session.NewShellListenerManager(sm, term, eventBus.Session)
 	// Create adapter for terminal.SessionManager interface
 	smAdapter := &sessionManagerAdapter{sm: sm}
 	shellMode := terminal.NewRawShellMode(smAdapter, inputMan, term)
@@ -77,7 +90,7 @@ func NewCore(cfg cli.Config) *Core {
 		SessionManager:       sm,
 		ShellListenerManager: slm,
 		terminal:             term,
-		eventChan:            eventChan,
+		eventBus:             eventBus,
 		InputMan:             inputMan,
 		shellMode:            shellMode,
 		commander:            NewCommandHandler(sm, slm, term, shellMode),
@@ -112,20 +125,58 @@ func (c *Core) Start() {
 	// event loop
 	for {
 		select {
-		case eventAny := <-c.eventChan:
-			switch e := eventAny.(type) {
-			case session.SessionConnectedEvent:
-				handleNewSessionEvent(e, c)
-			case terminal.ShellByteEvent:
-				handleShellByteEvent(e, c)
-			case terminal.MenuCmdEvent:
-				handleMenuCmdEvent(e, c)
-			}
-		case <-c.ctx.Done():
-			return
+		case e := <-c.eventBus.Session:
+			c.handleNewSessionEvent(e)
+		case e := <-c.eventBus.Menu:
+			c.handleMenuCmdEvent(e)
+		case e := <-c.eventBus.Shell:
+			c.handleShellByteEvent(e)
+		case <-c.ctx.Done(): return
 		}
 	}
 }
+
+
+// Triggered when a shell lands
+func (c *Core ) handleNewSessionEvent(e event.NewSessionEvent) {
+	ID := e.SessionID
+	addr := e.SessionAddr
+	systemOS := e.SystemOS
+	c.terminal.Message("\n[+] %s => New session #%d | %s \n", addr, ID, systemOS)
+	c.terminal.Prompt()
+}
+
+func (c *Core ) handleMenuCmdEvent(e event.MenuCmdEvent) {
+	input := e.Input
+	c.commander.Execute(input)
+}
+
+
+func (c *Core ) handleShellByteEvent(e event.ShellByteEvent) {
+	// WARN: Should be buffer instead?
+	if e.Byte == CtrlD {
+		// h.ShellMode().Exit()
+		c.shellMode.Exit()
+		return
+	}
+
+	// Convert CR to LF for Unix shells
+	// FIX: HMMM without this the overal shell doesnt wrap properly (even when exiting???)
+	b := e.Byte
+	if b == '\r' {
+		b = '\n'
+	}
+
+	// Forward to remote shell
+	sess, err := c.SessionManager.Get(c.shellMode.GetActiveSessionId())
+	if err != nil {
+		// Session died while we were in it
+		c.shellMode.Exit()
+		return
+	}
+	sess.Write([]byte{b})
+}
+
 
 func (c *Core) Shutdown() {
 	c.terminal.Message("\n[*] Shutting down gracefully...\n")

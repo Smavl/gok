@@ -3,6 +3,8 @@ package terminal
 import (
 	"context"
 	"sync"
+
+	"github.com/smavl/gok/internal/event"
 )
 
 type InputManagerImpl struct {
@@ -10,8 +12,11 @@ type InputManagerImpl struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	reader  InputReader
-	eventCh chan<- any
 	wg      sync.WaitGroup
+	// even channelse
+	// eventCh chan<- event.Event
+	shellChan chan<- event.ShellByteEvent
+	menuChan  chan<- event.MenuCmdEvent
 }
 
 type InputManager interface {
@@ -21,10 +26,12 @@ type InputManager interface {
 	SwapReader(reader InputReader)
 }
 
-func NewInputManager(initialInputRead InputReader, evenCh chan<- any) *InputManagerImpl {
+// func NewInputManager(initialInputRead InputReader, evenCh chan<- event.Event) *InputManagerImpl {
+func NewInputManager(initialInputRead InputReader, shellCh chan<- event.ShellByteEvent, menuCh chan<- event.MenuCmdEvent) *InputManagerImpl {
 	return &InputManagerImpl{
 		reader:  initialInputRead,
-		eventCh: evenCh,
+		shellChan: shellCh,
+		menuChan:  menuCh,
 	}
 }
 
@@ -51,6 +58,7 @@ func (im *InputManagerImpl) Stop() {
 	im.wg.Wait()
 }
 
+// Run loop
 func (im *InputManagerImpl) run() {
 	// signal to WaitGroup when done
 	defer im.wg.Done()
@@ -60,17 +68,25 @@ func (im *InputManagerImpl) run() {
 			// exits function (and wg.Done is called)
 			return
 		default:
-			// Read event from InputReader (producer?)
-			event := im.reader.Read()
-			// in case of event
-			if event != nil {
+			// Read event from InputReader
+			val := im.reader.Read()
+
+			// WARN: Dirty type cast
+			switch e := val.(type) {
+			case event.ShellByteEvent:
+				// send to shell channel
 				select {
-				// send event to
-				case im.eventCh <- event:
-				// Check also for Done signal inside event?
-				case <-im.ctx.Done():
-					return
+				case im.shellChan <- e:
+				case <-im.ctx.Done(): return
 				}
+			case event.MenuCmdEvent:
+				// send to menu channel
+				select {
+				case im.menuChan <- e:
+				case <-im.ctx.Done(): return
+				}
+			default:
+				// unknown event type, ignore
 			}
 		}
 	}
