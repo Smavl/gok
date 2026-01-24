@@ -1,5 +1,7 @@
 # Roadmap (Short term)
 
+To plan a little ahead below are goals of the next development iterations of `gok`
+
 ## Version 0.0
 - [x] CLI flags
     - [x] Switch to kong? [kong](https://github.com/alecthomas/kong) 
@@ -26,33 +28,65 @@
 ## Version 0.1
 
 - [x] Timeout refactor
-- [ ] Refactor directory structure
-- [ ] CLI flags
+- [x] Refactor directory structure
+- [x] CLI flags
     - [x] Timeout flag(s)
+- [x] Prober 
+    - [x] Add delimiter to optimize performance of enumeration
+- [x] directory structure refactor
+- [x] Domain interfaces 
+
+## Version 0.2 - Prober modes
+- [ ] CLI flags
     - [ ] Probing flags (modes)
 - [ ] Prober 
+    - [ ] ProbeBuilder
     - [ ] Modes (Default, Agressive, stealth)
-    - [x] Add delimiter to optimize performance of enumeration
 
-## Version 0.2
+## Version 0.3 - Shell upgrading
+- [ ] Automatic shell upgrading 
+    - [ ] Simple shell upgrading implementation (python)
+    - [ ] CLI flag: Automatically drop into shell (default)
 
+## Future versions:
+### Logging:
+- [ ] Debugging- and/or general logs
+    - [ ] Use `log/slog`?
 - [ ] CLI flags
     - [ ] Debug/log flag
-- [ ] Debugging- and/or general logs
-- [ ] Menu actions
-    - [ ] Session details (info from the prober?)
+
+### Meta-mode
 - [ ] Meta mode
     - [ ] Add escaping
     - [ ] Implement line-buffered input handler
     - [ ] inside active shell to run payloads and 
-- [ ] Automatic shell upgrading 
-    - [ ] Simple shell upgrading implementation (python)
-    - [ ] CLI flag: Automatically drop into shell (default)
+
+### Prober
+- [ ] Prober Builder
 - [ ] Prober (linux)
     - [ ] EnumerateUser
     - [ ] EnumerateUsers
 
+### Main menu 
+- [ ] History (up, down)
+- [ ] Tab completion
+- [ ] Session details (info from the prober?)
+
+
+## Version 1.0 - Goals
+
+- Useable for a HTB box
+- Windows Prober (at least basic)
+- All modes: Menu, Shell, Meta-mode
+- Little to none technical debt
+- Okay testing suite: Unit + Integration
+- Modules: 
+    - Basic modules: File upload/download
+    - extendability
+
 # Roadmap - Long term
+
+Below are features that are interesting and might get implemented (+ and noted down so i dont forget;) )
 
 ## Shell 
 
@@ -80,6 +114,7 @@
 - [ ] EnumerateUser(s) 
 - [ ] Parse env
 - [ ] Modes: default, aggressive, (stealthy?)
+- [ ] Probe bulder (to help modes, and strategies)
 - [ ] Fingerprinting
 
 ## Menu mode
@@ -156,3 +191,4 @@
 - [ ] Docker playground (no `testcontainers-go`)
     - [ ] Template docker file
     - [ ] Demos?
+- [ ] Can be imported by other go code (and python maybe) to stream line exploits
