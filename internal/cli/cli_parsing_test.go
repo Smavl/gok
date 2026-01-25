@@ -149,6 +149,113 @@ func TestPortRangeTableDriven(t *testing.T) {
 	}
 }
 
+func TestProbingModeOmitted(t *testing.T) {
+	// Given no probing mode arg
+	args := []string{}
+
+	// When i parse it
+	parser := kong.Must(&Flags)
+	_, err := parser.Parse(args)
+
+	// Then
+	if err != nil {
+		t.Fatalf("Got error: %v", err)
+	}
+
+	// TEST: check for default mode
+	gotMode := Flags.ProbingMode
+	if gotMode != Default {
+		t.Errorf("Got mode: %v, want mode: %v", gotMode, Default)
+	}
+}
+
+// Tabel driven tests for probing mode parsing
+func TestProbingMode(t *testing.T) {
+	tests := []struct {
+		name         string
+		arg          string
+		wantMode     ProbingMode
+		expectingErr bool
+	}{
+		// Positive tests
+		{
+			name:         "Valid: default mode",
+			arg:          "0",
+			wantMode:     Default,
+			expectingErr: false,
+		},
+		{
+			name:         "Valid: agressive mode",
+			arg:          "1",
+			wantMode:     Agressive,
+			expectingErr: false,
+		},
+		{
+			name:         "Valid: stealth mode",
+			arg:          "2",
+			wantMode:     Stealth,
+			expectingErr: false,
+		},
+		// Negative tests
+		{
+			name:         "No value supplied",
+			arg:          "",
+			wantMode:     Default,
+			expectingErr: true,
+		},
+		{
+			name:         "Invalid: negative value",
+			arg:          "-1",
+			wantMode:     Default,
+			expectingErr: true,
+		},
+		{
+			name:         "No mode: 4",
+			arg:          "4",
+			wantMode:     Default,
+			expectingErr: true,
+		},
+		{
+			name:         "garbage int",
+			arg:          "123",
+			wantMode:     Default,
+			expectingErr: true,
+		},
+		{
+			name:         "non-numeric",
+			arg:          "abc",
+			wantMode:     Default,
+			expectingErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given the flag and arg
+			args := []string{"-A", tt.arg}
+
+			// When i parse it
+			parser := kong.Must(&Flags)
+			_, err := parser.Parse(args)
+
+			// Then
+			// TEST: check for expected error
+			if (err != nil) != tt.expectingErr {
+				t.Fatalf("Got error: %v, expectingErr: %v", err, tt.expectingErr)
+			}
+			if err != nil {
+				return
+			}
+
+			// TEST: check for expected mode
+			gotMode := Flags.ProbingMode
+			if gotMode != tt.wantMode {
+				t.Errorf("Got mode: %v, want mode: %v", gotMode, tt.wantMode)
+			}
+		})
+	}
+}
+
 // func TestXX(t *testing.T) {
 // 	// Given
 //
