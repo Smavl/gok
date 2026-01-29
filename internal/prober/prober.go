@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/misc"
 )
 
@@ -170,6 +171,7 @@ type Prober interface {
 
 type ProberOptions struct {
 	CmdTimeout time.Duration
+	ProbingMode domain.ProbingMode
 }
 
 func getExitCode(output []string, delimiter string) (BashExitCode, error) {

@@ -11,15 +11,12 @@ Gok aims to replace the muscle memory of `nc -lvnp 9001` with `gok -p 9001`, and
   - Specify multiple IP addresses and ports
   - Jump between multiple sessions (History persistance)
 - Automatic shell upgrading (WIP)
+- Prober: Automatically gather information
 - (Somewhat) Asynchronous and event-driven architecture
 - Cross-platform support (Linux, Windows, MacOS) (WIP)
-- Automatically gather system information:
-  - Detect OS
-  - Enumerate available Binaries 
-  - ...
 
-**Modes**
-- Menu mode - Main management interface
+## Interfactive Modes
+- Menu mode - Management and overview
   - Command interface (Manage: sessions, listeners)
   - Manage multiple reverse shell sessions
   - Session interaction switching and escaping
@@ -30,7 +27,22 @@ Gok aims to replace the muscle memory of `nc -lvnp 9001` with `gok -p 9001`, and
   - Run scripts/modules
   - Utility: download, upload tools
 
+## Prober
+**Modes**: Default, Agressive (WIP), stealth (WIP)
 
+Default:
+- OS detection
+- Available binaries enumeration
+
+Aggressive (WIP):
+- Elaborate binary enumeration
+- File system enumeration
+- User enumeration
+- SUID enumeration
+- ...
+
+Stealth (WIP):
+- ... (TBD)
 
 # Installation
 
@@ -48,10 +60,10 @@ Optional:
 git clone https://github.com/smavl/gok
 cd gok
 # build binary
-go build
-./gok
+go build cmd/gok/main.go
+./main
 # Or run directly with go
-go run .
+go run cmd/gok/main.go
 ```
 **one-line: (WIP)**
 ```bash
@@ -91,12 +103,9 @@ Available Commands:
 You can run the tests with:
 ```bash
 # run "unit" tests
-$ go test 
-```
-
-```bash
-# run dockerized integration tests
-$ go test -tags=integration  .
+$ go test ./...
+# Run dockerized integration tests (also)
+$ go test -tags=integration ./... -v
 ```
 
 # Kudos

@@ -37,8 +37,8 @@ To plan a little ahead below are goals of the next development iterations of `go
 - [x] Domain interfaces 
 
 ## Version 0.2 - Prober modes
-- [ ] CLI flags
-    - [ ] Probing flags (modes)
+- [x] CLI flags
+    - [x] Probing flags (modes)
 - [ ] Prober 
     - [ ] ProbeBuilder
     - [ ] Modes (Default, Agressive, stealth)
@@ -49,6 +49,14 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [ ] CLI flag: Automatically drop into shell (default)
 
 ## Future versions:
+
+### Refactor
+- [ ] Strip down Core -> not blob/god-object
+- [ ] Session encapsulation issue
+- [ ] Add domain interfaces to be used other places?
+- [ ] Workaround: `IsProberDone`
+- [ ] Too many concerns: `outputLoop`
+
 ### Logging:
 - [ ] Debugging- and/or general logs
     - [ ] Use `log/slog`?
@@ -181,6 +189,7 @@ Below are features that are interesting and might get implemented (+ and noted d
 
 ## To be ordered features
 
+- [ ] Bind shell / reconnect thingy
 - [ ] SSH 
     - [ ] SSH key enumerator
     - [ ] SSH key injector (`echo ... >> PATH/.ssh/authorized_keys`)

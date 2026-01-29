@@ -1,8 +1,10 @@
 package cli
 
 import (
-	"github.com/alecthomas/kong"
 	"testing"
+
+	"github.com/alecthomas/kong"
+	"github.com/smavl/gok/internal/domain"
 )
 
 // table driven tests for port range parsing
@@ -164,8 +166,8 @@ func TestProbingModeOmitted(t *testing.T) {
 
 	// TEST: check for default mode
 	gotMode := Flags.ProbingMode
-	if gotMode != Default {
-		t.Errorf("Got mode: %v, want mode: %v", gotMode, Default)
+	if gotMode != domain.Default {
+		t.Errorf("Got mode: %v, want mode: %v", gotMode, domain.Default)
 	}
 }
 
@@ -174,57 +176,57 @@ func TestProbingMode(t *testing.T) {
 	tests := []struct {
 		name         string
 		arg          string
-		wantMode     ProbingMode
+		wantMode     domain.ProbingMode
 		expectingErr bool
 	}{
 		// Positive tests
 		{
 			name:         "Valid: default mode",
 			arg:          "0",
-			wantMode:     Default,
+			wantMode:     domain.Default,
 			expectingErr: false,
 		},
 		{
 			name:         "Valid: agressive mode",
 			arg:          "1",
-			wantMode:     Agressive,
+			wantMode:     domain.Agressive,
 			expectingErr: false,
 		},
 		{
 			name:         "Valid: stealth mode",
 			arg:          "2",
-			wantMode:     Stealth,
+			wantMode:     domain.Stealth,
 			expectingErr: false,
 		},
 		// Negative tests
 		{
 			name:         "No value supplied",
 			arg:          "",
-			wantMode:     Default,
+			wantMode:     domain.Default,
 			expectingErr: true,
 		},
 		{
 			name:         "Invalid: negative value",
 			arg:          "-1",
-			wantMode:     Default,
+			wantMode:     domain.Default,
 			expectingErr: true,
 		},
 		{
 			name:         "No mode: 4",
 			arg:          "4",
-			wantMode:     Default,
+			wantMode:     domain.Default,
 			expectingErr: true,
 		},
 		{
 			name:         "garbage int",
 			arg:          "123",
-			wantMode:     Default,
+			wantMode:     domain.Default,
 			expectingErr: true,
 		},
 		{
 			name:         "non-numeric",
 			arg:          "abc",
-			wantMode:     Default,
+			wantMode:     domain.Default,
 			expectingErr: true,
 		},
 	}

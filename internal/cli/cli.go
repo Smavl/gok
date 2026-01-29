@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/smavl/gok/internal/domain"
 )
 
 var Flags struct {
@@ -14,7 +15,7 @@ var Flags struct {
 	BoundIPs  []string  `help:"IPs to bind the listeners on" default:"[0.0.0.0]" short:"b"`
 	// timeout flags
 	ProbingCmdTimeout time.Duration `help:"Timeout for probing commands" default:"200ms" short:"t"`
-	ProbingMode ProbingMode `help:"Level of agressiveness for the prober" default:"0" short:"A"`
+	ProbingMode domain.ProbingMode `help:"Level of agressiveness for the prober" default:"0" short:"A"`
 }
 
 type Config struct {
@@ -23,6 +24,7 @@ type Config struct {
 	PortRange         PortRange
 	// probing config
 	ProbingCmdTimeout time.Duration
+	ProbingMode       domain.ProbingMode
 
 	// misc
 	// TODO: testmode/headless mode
@@ -33,13 +35,6 @@ type PortRange struct {
 	Ports []int
 }
 
-type ProbingMode int 
-
-const (
-	Default ProbingMode = iota
-	Agressive
-	Stealth
-)
 
 func isValidPort(port int) bool {
 	minValidPort := 1
@@ -95,47 +90,16 @@ func (p *PortRange) Decode(ctx *kong.DecodeContext) error {
 	} else {
 		// single port
 		port, err := strconv.Atoi(value)
-		if !isValidPort(port) {
-			return fmt.Errorf("Invalid port in range: %d", port)
-		}
 		if err != nil {
-			return fmt.Errorf("Invalid port value: %v", err)
+			return fmt.Errorf("Invalid non-integer value: %v", err)
+		}
+		if !isValidPort(port) {
+			return fmt.Errorf("Invalid port: %d", port)
 		}
 
 		p.Ports = []int{port}
 
 	}
-	return nil
-}
-
-func isValidProbeMode(pm int) bool {
-	// check if int is a valid probing mode
-	if pm < 0 || pm > 2 {
-		return false
-	}
-	return true
-}
-
-func (p *ProbingMode) Decode(ctx *kong.DecodeContext) error {
-	var value string
-
-	if err := ctx.Scan.PopValueInto("probing-mode", &value); err != nil {
-		return err
-	}
-
-	// cast string to int
-	pmInt, err := strconv.Atoi(value)
-	if err != nil {
-		return fmt.Errorf("Invalid probing mode value, cast to int: %v", err)
-	}
-
-	// check if valid mode 
-	if !isValidProbeMode(pmInt) {
-		return fmt.Errorf("Invalid probing mode: %d. Valid modes are 0 (Default), 1 (Agressive), 2 (Stealth)", pmInt)
-	}
-
-	// cast to ProbingMode
-	*p = ProbingMode(pmInt)
 	return nil
 }
 

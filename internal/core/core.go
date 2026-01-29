@@ -69,6 +69,7 @@ func NewCore(cfg cli.Config) *Core {
 	inputMan := terminal.NewInputManager(terminal.NewLineReader(eventBus.Menu))
 	sm := session.NewSessionManager(prober.ProberOptions{
 		CmdTimeout: cfg.ProbingCmdTimeout,
+		ProbingMode: cfg.ProbingMode,
 	})
 	slm := session.NewShellListenerManager(sm, term, eventBus.Session)
 	shellMode := terminal.NewRawShellMode(inputMan, term, eventBus.Shell, eventBus.Menu)
