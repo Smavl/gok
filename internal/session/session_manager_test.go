@@ -5,8 +5,8 @@ import (
 	"net"
 	"testing"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/misc"
-	"github.com/smavl/gok/internal/prober"
 )
 
 type FakeDisplay struct{}
@@ -20,7 +20,11 @@ func NewFakeDisplay() *FakeDisplay {
 }
 
 func newTestSessionManager() *SessionManager {
-	return NewSessionManager(prober.ProberOptions{})
+	opts := domain.ProbingOptions{
+		ProbingMode:   domain.Default,
+		DisableProber: true,
+	}
+	return NewSessionManager(opts)
 }
 
 func TestIdIncrement(t *testing.T) {

@@ -11,7 +11,6 @@ import (
 	"github.com/smavl/gok/internal/cli"
 	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/event"
-	"github.com/smavl/gok/internal/prober"
 	"github.com/smavl/gok/internal/session"
 	"github.com/smavl/gok/internal/terminal"
 )
@@ -65,12 +64,14 @@ func NewCore(cfg cli.Config) *Core {
 		os.Exit(1)
 	}
 
+	ProbingOptions := domain.ProbingOptions{
+		ProbingMode:       cfg.ProbingMode,
+		DisableProber:     cfg.DisableProber,
+	}
+
 	eventBus := event.NewEventBus()
 	inputMan := terminal.NewInputManager(terminal.NewLineReader(eventBus.Menu))
-	sm := session.NewSessionManager(prober.ProberOptions{
-		CmdTimeout: cfg.ProbingCmdTimeout,
-		ProbingMode: cfg.ProbingMode,
-	})
+	sm := session.NewSessionManager(ProbingOptions)
 	slm := session.NewShellListenerManager(sm, term, eventBus.Session)
 	shellMode := terminal.NewRawShellMode(inputMan, term, eventBus.Shell, eventBus.Menu)
 

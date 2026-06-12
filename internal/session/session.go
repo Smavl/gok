@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/misc"
 	"github.com/smavl/gok/internal/prober"
+	"github.com/smavl/gok/internal/prober/types"
 )
 
 type SessionState int
@@ -71,7 +73,7 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 }
 
 type SystemInfo struct {
-	OS prober.OS
+	OS types.OS
 }
 
 type Session struct {
@@ -88,8 +90,8 @@ type Session struct {
 	probingBuffer      *HistoryLineBuffer
 	probingDataArrived chan struct{}
 	SystemInfo         SystemInfo
-	Prober             prober.Prober
-	probeOpts          prober.ProberOptions
+	Prober             *prober.Prober
+	ProbingOptions domain.ProbingOptions
 
 	// context things
 	ctx    context.Context
@@ -102,17 +104,18 @@ func (s *Session) GetID() int {
 }
 
 type SessionManager struct {
-	mu        sync.RWMutex
-	currentID int
-	sessions  map[int]*Session
-	probeOpts prober.ProberOptions
+	mu          sync.RWMutex
+	currentID   int
+	sessions    map[int]*Session
+	probOpts domain.ProbingOptions 
 }
 
-func NewSessionManager(probeOpts prober.ProberOptions) *SessionManager {
+func NewSessionManager(probingOpts domain.ProbingOptions) *SessionManager {
 	return &SessionManager{
-		currentID: 0,
-		sessions:  make(map[int]*Session),
-		probeOpts: probeOpts,
+		currentID:   0,
+		sessions:    make(map[int]*Session),
+		probOpts: probingOpts,
+		// ProbingOpTimout: probingOpTimeout,
 	}
 }
 
@@ -126,15 +129,16 @@ func (sm *SessionManager) incID() int {
 
 func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session, error) {
 	session := Session{
-		ID:                sm.incID(),
-		conn:              conn,
-		Addr:              conn.RemoteAddr().String(),
-		display:           display,
-		history:           CreateLineBuffer(defaultHistoryMaxLines),
-		probingBuffer:     CreateLineBuffer(defaultHistoryMaxLines),
+		ID:                 sm.incID(),
+		conn:               conn,
+		Addr:               conn.RemoteAddr().String(),
+		display:            display,
+		history:            CreateLineBuffer(defaultHistoryMaxLines),
+		probingBuffer:      CreateLineBuffer(defaultHistoryMaxLines),
 		probingDataArrived: make(chan struct{}),
-		SystemInfo:        SystemInfo{},
-		probeOpts:         sm.probeOpts,
+		SystemInfo:         SystemInfo{},
+		// probingMode:        sm.probOpts.ProbingMode,
+		ProbingOptions:   sm.probOpts,
 	}
 
 	sm.mu.Lock()
@@ -195,7 +199,9 @@ func (s *Session) Start(ctx context.Context) error {
 	go s.outputLoop()
 
 	// NOTE: probing session has to happen after outputLoop is initialized
-	s.probeSession()
+	if !s.ProbingOptions.DisableProber {
+		s.probeSession()
+	}
 	return nil
 }
 
@@ -204,24 +210,29 @@ func (s *Session) probeSession() error {
 	s.state = StateProbing
 	s.mu.Unlock()
 
-	// get os
-	rcmds := prober.RandomCommandStrategy{CmdTimeout: s.probeOpts.CmdTimeout}
-	OS, err := rcmds.DetermineOS(s)
-	if err != nil {
-		return err
-	}
-	s.SystemInfo.OS = OS
+	// TODO: Add OS detection as an operation in PhaseInitial
+	// For now, assume Linux
+	s.SystemInfo.OS = types.LinuxOs
 
-	// Fetch binaries
-	prober, err := OS.GetNewProber(s, s.probeOpts)
+	// Create prober with configured mode
+	newProber, err := prober.NewProber(s, s.ProbingOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create prober: %w", err)
 	}
+
 	s.mu.Lock()
-	s.Prober = prober
+	s.Prober = newProber
 	s.mu.Unlock()
 
-	prober.EnumerateBinaries()
+	// TODO: Is this needed? Does this kill valid sessions?
+	// Use a timeout to prevent hanging on unresponsive shells
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_, err = newProber.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("probing failed: %w", err)
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
