@@ -50,6 +50,7 @@ func (p *Prober) runPhase(ctx context.Context, phase types.ProbePhase, cfg types
 		opCtx, cancel := context.WithTimeout(ctx, cfg.TimeoutPerOp)
 
 		// Execute operation
+		// result, err := op(opCtx, p.sess)
 		result, err := op(opCtx, p.sess)
 		cancel()
 
@@ -59,7 +60,9 @@ func (p *Prober) runPhase(ctx context.Context, phase types.ProbePhase, cfg types
 			continue
 		}
 
-		p.results.Add(result)
+		// Apply whatever result
+		result.Apply(p.results)
+
 	}
 
 	return nil
@@ -67,19 +70,6 @@ func (p *Prober) runPhase(ctx context.Context, phase types.ProbePhase, cfg types
 
 // GetBinaries returns the list of found binaries 
 func (p *Prober) GetBinaries() []string {
-	if p.results == nil {
-		return []string{}
-	}
-
-	binaries := []string{}
-	for _, result := range p.results.GetResults() {
-		if result.Name == "binaries" {
-			if binaryResult, ok := result.Data.([]string); ok {
-				binaries = append(binaries, binaryResult...)
-			}
-		}
-	}
-
-	return binaries
+	return p.results.BinariesFound
 }
 

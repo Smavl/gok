@@ -14,7 +14,7 @@ func EnumerateBinaries(
 	primaryStrategy strategy.BinaryCheckStrategy,
 	fallbackStrategies []strategy.BinaryCheckStrategy,
 ) types.ProbeOperation {
-	return func(ctx context.Context, sess types.SessionInterface) (*types.ProbeResult, error) {
+	return func(ctx context.Context, sess types.SessionInterface) (types.ProbeResult, error) {
 		found := []string{}
 
 		for _, binary := range binaries {
@@ -44,9 +44,6 @@ func EnumerateBinaries(
 			}
 		}
 
-		return &types.ProbeResult{
-			Name: "binaries",
-			Data: found,
-		}, nil
+		return types.BinariesResult{Binaries: found}, nil
 	}
 }

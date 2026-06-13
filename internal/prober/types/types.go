@@ -43,26 +43,45 @@ const (
 )
 
 
-type ProbeResult struct {
-	Name string
-	Data interface{}
+type ProbeResult interface {
+	Apply(results *ProbeResults)
+}
+
+type OSResult struct {
+	DetectedOS OS 
+}
+
+func (r OSResult) Apply(pr *ProbeResults){
+	pr.OS = r.DetectedOS
+}
+
+type BinariesResult struct {
+	Binaries []string
+}
+
+func (r BinariesResult) Apply(pr *ProbeResults){
+	pr.BinariesFound = append(pr.BinariesFound, r.Binaries...)
+
+	// TODO: maybe update capabilties / derived capabilties here
 }
 
 type ProbeResults struct {
-	Results []*ProbeResult
+	// Results []*ProbeResult
+	OS OS 
+	BinariesFound []string
+
+	// future results:
+	// Users []User
+	// Files []File
+	// NetworkInfo *NetworkInfo
+	// Capabilities Capabilities
 }
 
-func (pr *ProbeResults) Add(result *ProbeResult) {
-	if result != nil {
-		pr.Results = append(pr.Results, result)
-	}
-}
+// type Capabilities struct {
+// 	HasWhich
+// }
 
-func (pr *ProbeResults) GetResults() []*ProbeResult {
-	return pr.Results
-}
-
-type ProbeOperation func(ctx context.Context, sess SessionInterface) (*ProbeResult, error)
+type ProbeOperation func(ctx context.Context, sess SessionInterface) (ProbeResult, error)
 
 type PhaseConfig struct {
 	Operations      []ProbeOperation
