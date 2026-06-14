@@ -12,3 +12,7 @@ import (
 type BinaryCheckStrategy interface {
 	CheckExists(ctx context.Context, sess types.SessionInterface, binary string) (bool, error)
 }
+
+type OSDetectionStrategy interface {
+	DetermineOS(ctx context.Context, sess types.SessionInterface) (types.OS, error)	
+}

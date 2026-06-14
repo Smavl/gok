@@ -29,6 +29,13 @@ func NewProber(sess types.SessionInterface, opts domain.ProbingOptions) (*Prober
 func (p *Prober) Run(ctx context.Context) (*types.ProbeResults, error) {
 	phases := []types.ProbePhase{types.PhaseInitial, types.PhaseRecon, types.PhaseDeepScan}
 
+	// Run Genesis phase for os detection
+	err := p.runPhase(ctx,p.config.Genesis)
+	if err != nil {
+		// ERROR: Genesis phase failed
+		return p.results, err
+	}
+
 	// Run each phase
 	for _, phase := range phases {
 		phaseConfig, exists := p.config.Phases[phase]
@@ -36,7 +43,7 @@ func (p *Prober) Run(ctx context.Context) (*types.ProbeResults, error) {
 			continue
 		}
 
-		if err := p.runPhase(ctx, phase, phaseConfig); err != nil {
+		if err := p.runPhase(ctx, phaseConfig); err != nil {
 			return p.results, err
 		}
 	}
@@ -44,13 +51,12 @@ func (p *Prober) Run(ctx context.Context) (*types.ProbeResults, error) {
 	return p.results, nil
 }
 
-func (p *Prober) runPhase(ctx context.Context, phase types.ProbePhase, cfg types.PhaseConfig) error {
+func (p *Prober) runPhase(ctx context.Context, cfg types.PhaseConfig) error {
 	for _, op := range cfg.Operations {
 		// Create timeout context for this operation
 		opCtx, cancel := context.WithTimeout(ctx, cfg.TimeoutPerOp)
 
 		// Execute operation
-		// result, err := op(opCtx, p.sess)
 		result, err := op(opCtx, p.sess)
 		cancel()
 
@@ -60,7 +66,7 @@ func (p *Prober) runPhase(ctx context.Context, phase types.ProbePhase, cfg types
 			continue
 		}
 
-		// Apply whatever result
+		// Apply whatever result respective to the operation
 		result.Apply(p.results)
 
 	}

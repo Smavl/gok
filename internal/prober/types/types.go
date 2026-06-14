@@ -88,6 +88,15 @@ type PhaseConfig struct {
 	TimeoutPerOp	time.Duration
 }
 
+type PhaseBuilder func(accResults *ProbeResults) *PhaseConfig
+
 type ProbeConfig struct {
-	Phases map[ProbePhase]PhaseConfig
+	// Phases map[ProbePhase]PhaseConfig
+
+	// First static phase (e.g. OS detection)
+	Genesis PhaseConfig
+
+	// Rest of the phases are dynamically build on intel from prior probes
+	Phases map[ProbePhase]PhaseBuilder
+
 }
