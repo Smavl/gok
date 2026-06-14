@@ -2,6 +2,7 @@ package prober
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/prober/config"
@@ -12,6 +13,7 @@ type Prober struct {
 	sess    types.SessionInterface
 	config  types.ProbeConfig
 	results *types.ProbeResults
+	done bool
 }
 
 func NewProber(sess types.SessionInterface, opts domain.ProbingOptions) (*Prober, error) {
@@ -23,32 +25,58 @@ func NewProber(sess types.SessionInterface, opts domain.ProbingOptions) (*Prober
 		sess:    sess,
 		config:  cfg,
 		results: &types.ProbeResults{},
+		done: false,
 	}, nil
 }
 
-func (p *Prober) Run(ctx context.Context) (*types.ProbeResults, error) {
+func (p *Prober) setDone() {
+	p.done = true
+}
+
+func (p *Prober) IsDone() bool {
+	return p.done
+}
+
+func newPhaseBuilderContext(p *Prober) types.PhaseBuilderContext {
+	return types.PhaseBuilderContext{
+		ProbeResults: p.results,
+	}
+}
+
+func (p *Prober) Run(ctx context.Context) (error) {
+	bctx := newPhaseBuilderContext(p)
 	phases := []types.ProbePhase{types.PhaseInitial, types.PhaseRecon, types.PhaseDeepScan}
+	// TODO: Should a failed run also just be "done"?
+	defer p.setDone()
 
 	// Run Genesis phase for os detection
 	err := p.runPhase(ctx,p.config.Genesis)
 	if err != nil {
 		// ERROR: Genesis phase failed
-		return p.results, err
+		return err
 	}
 
-	// Run each phase
+	// Run each dynamic phase
 	for _, phase := range phases {
-		phaseConfig, exists := p.config.Phases[phase]
+		phaseBuilder, exists := p.config.Phases[phase]
+
 		if !exists {
 			continue
 		}
 
-		if err := p.runPhase(ctx, phaseConfig); err != nil {
-			return p.results, err
+		// build phase
+		builtPhase, present := phaseBuilder(bctx)
+		if !present {
+			// NOTE: error handling???
+			// phase was not built 
+			continue
+		}
+		if err := p.runPhase(ctx, *builtPhase); err != nil {
+			return err
 		}
 	}
 
-	return p.results, nil
+	return nil
 }
 
 func (p *Prober) runPhase(ctx context.Context, cfg types.PhaseConfig) error {
@@ -72,6 +100,13 @@ func (p *Prober) runPhase(ctx context.Context, cfg types.PhaseConfig) error {
 	}
 
 	return nil
+}
+
+func (p* Prober) GetProbingResultsIfDone() (*types.ProbeResults, error) {
+	if !p.done {
+		return nil, fmt.Errorf("probing not completed yet")
+	}
+	return p.results, nil
 }
 
 // GetBinaries returns the list of found binaries 

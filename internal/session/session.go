@@ -72,9 +72,13 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 	}
 }
 
-type SystemInfo struct {
+type SessionInfo struct {
 	OS types.OS
+	binaries []string
 }
+// type SystemInfo struct {
+// 	OS types.OS
+// }
 
 type Session struct {
 	ID   int
@@ -89,7 +93,7 @@ type Session struct {
 	// probing
 	probingBuffer      *HistoryLineBuffer
 	probingDataArrived chan struct{}
-	SystemInfo         SystemInfo
+	SessionInfo         SessionInfo
 	Prober             *prober.Prober
 	ProbingOptions domain.ProbingOptions
 
@@ -136,7 +140,7 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 		history:            CreateLineBuffer(defaultHistoryMaxLines),
 		probingBuffer:      CreateLineBuffer(defaultHistoryMaxLines),
 		probingDataArrived: make(chan struct{}),
-		SystemInfo:         SystemInfo{},
+		SessionInfo:         SessionInfo{},
 		// probingMode:        sm.probOpts.ProbingMode,
 		ProbingOptions:   sm.probOpts,
 	}
@@ -210,18 +214,14 @@ func (s *Session) probeSession() error {
 	s.state = StateProbing
 	s.mu.Unlock()
 
-	// TODO: Add OS detection as an operation in PhaseInitial
-	// For now, assume Linux
-	s.SystemInfo.OS = types.LinuxOs
-
 	// Create prober with configured mode
-	newProber, err := prober.NewProber(s, s.ProbingOptions)
+	prober, err := prober.NewProber(s, s.ProbingOptions)
 	if err != nil {
 		return fmt.Errorf("failed to create prober: %w", err)
 	}
 
 	s.mu.Lock()
-	s.Prober = newProber
+	s.Prober = prober
 	s.mu.Unlock()
 
 	// TODO: Is this needed? Does this kill valid sessions?
@@ -229,16 +229,27 @@ func (s *Session) probeSession() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	_, err = newProber.Run(ctx)
+	err = prober.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("probing failed: %w", err)
 	}
+
+	pres, err := prober.GetProbingResultsIfDone()
+	if err != nil {
+		return fmt.Errorf("Prober was not done or failed to get probing results: %w", err)
+	}
+	s.consumeProbingResults(pres)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state = StateBackgrounded
 
 	return nil
+}
+
+func (s *Session) consumeProbingResults(pr *types.ProbeResults) {
+	s.SessionInfo.OS = pr.OS
+	s.SessionInfo.binaries = pr.BinariesFound
 }
 
 func (s *Session) GetProbingLines() []string {
@@ -254,7 +265,7 @@ func (s *Session) GetProbingDataChannel() <-chan struct{} {
 func (s *Session) IsProberDone() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state == StateBackgrounded && s.Prober != nil
+	return s.Prober != nil && s.Prober.IsDone()
 }
 
 func (s *Session) ClearProbingBuffer() {

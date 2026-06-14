@@ -57,7 +57,7 @@ func TestRevshellSimple(t *testing.T) {
   require.Eventually(t, func() bool {
     s, err = c.SessionManager.Get(0)
     if err != nil { return false }
-    return s.SystemInfo.OS == types.LinuxOs
+    return s.SessionInfo.OS == types.LinuxOs
   }, 1*time.Second, 2*time.Millisecond, "Expected session OS to be Linux")
 
 
