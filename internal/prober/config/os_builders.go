@@ -22,7 +22,7 @@ func newOSPhaseBuilder(os types.OS, mode domain.ProbingMode) (OSPhaseBuilder, er
 	case types.UnknownOS:
 		return &unknownOSPhaseBuilder{}, nil
 	default:
-		return nil, nil
+		return &unknownOSPhaseBuilder{}, nil
 	}
 }
 

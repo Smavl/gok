@@ -203,16 +203,29 @@ func (s *Session) Start(ctx context.Context) error {
 	go s.outputLoop()
 
 	// NOTE: probing session has to happen after outputLoop is initialized
-	if !s.ProbingOptions.DisableProber {
-		s.probeSession()
+	if s.ProbingOptions.DisableProber {
+		// TODO: Add error?
+		return nil
+	}
+
+	err := s.probeSession()
+	if err != nil {
+		return fmt.Errorf("failed to probe session: %w", err)
 	}
 	return nil
 }
 
 func (s *Session) probeSession() error {
 	s.mu.Lock()
-	s.state = StateProbing
+	s.setState(StateProbing)
 	s.mu.Unlock()
+
+	// For now when both the prober is sucessfully run, or fails set the state to Backgrounded
+	defer func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.setState(StateBackgrounded)
+	}()
 
 	// Create prober with configured mode
 	prober, err := prober.NewProber(s, s.ProbingOptions)
@@ -224,9 +237,9 @@ func (s *Session) probeSession() error {
 	s.Prober = prober
 	s.mu.Unlock()
 
-	// TODO: Is this needed? Does this kill valid sessions?
-	// Use a timeout to prevent hanging on unresponsive shells
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Either "terminate" when the prober is done, or after timeout
+	probingTimeout := 30 * time.Second
+	ctx, cancel := context.WithTimeout(s.ctx, probingTimeout)
 	defer cancel()
 
 	err = prober.Run(ctx)
@@ -240,14 +253,13 @@ func (s *Session) probeSession() error {
 	}
 	s.consumeProbingResults(pres)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.state = StateBackgrounded
 
 	return nil
 }
 
 func (s *Session) consumeProbingResults(pr *types.ProbeResults) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.SessionInfo.OS = pr.OS
 	s.SessionInfo.binaries = pr.BinariesFound
 }
@@ -309,7 +321,7 @@ func (s *Session) outputLoop() {
 
 			// other must be normal error:
 			s.mu.Lock()
-			s.state = StateDead
+			s.setState(StateDead)
 			s.mu.Unlock()
 			return
 		}
@@ -358,7 +370,7 @@ func (s *Session) Write(p []byte) (int, error) {
 func (s *Session) Foreground() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.state = StateActive
+	s.setState(StateActive)
 
 	if len(s.history.lines) > 0 {
 		s.display.Write([]byte(string("[*] Resuming session...\n")))
@@ -369,11 +381,16 @@ func (s *Session) Foreground() {
 	}
 }
 
+// The caller should lock themselves
+func (s *Session) setState(state SessionState) {
+	s.state = state
+}
+
 func (s *Session) Background() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.state != StateDead {
-		s.state = StateBackgrounded
+		s.setState(StateBackgrounded)
 	}
 }
 
@@ -383,7 +400,7 @@ func (s *Session) Stop() {
 		s.mu.Unlock()
 		return
 	}
-	s.state = StateDead
+	s.setState(StateDead)
 	if s.cancel != nil {
 		s.cancel()
 	}

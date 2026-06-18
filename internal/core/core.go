@@ -64,14 +64,14 @@ func NewCore(cfg cli.Config) *Core {
 		os.Exit(1)
 	}
 
-	ProbingOptions := domain.ProbingOptions{
+	probingOptions := domain.ProbingOptions{
 		ProbingMode:       cfg.ProbingMode,
 		DisableProber:     cfg.DisableProber,
 	}
 
 	eventBus := event.NewEventBus()
 	inputMan := terminal.NewInputManager(terminal.NewLineReader(eventBus.Menu))
-	sm := session.NewSessionManager(ProbingOptions)
+	sm := session.NewSessionManager(probingOptions)
 	slm := session.NewShellListenerManager(sm, term, eventBus.Session)
 	shellMode := terminal.NewRawShellMode(inputMan, term, eventBus.Shell, eventBus.Menu)
 

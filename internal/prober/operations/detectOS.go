@@ -18,8 +18,22 @@ func DetectOS(
 ) types.ProbeOperation {
 	return func(ctx context.Context, sess types.SessionInterface) (types.ProbeResult, error) {
 
-		OS, err := primaryStrategy.DetermineOS(ctx, sess)
+		// Run primary strategy 
+		OSres, err := primaryStrategy.DetermineOS(ctx, sess)
+		// Invert error check to return early on sucess
+		if err == nil {
+			return types.OSResult{DetectedOS: OSres}, nil
+		}
 
-		return types.OSResult{DetectedOS: OS}, err
+		// Run fallback strategies if primary failed
+		for _, fallback := range fallbackStrategies {
+			OSres, err = fallback.DetermineOS(ctx, sess)
+			if err == nil {
+				return types.OSResult{DetectedOS: OSres}, nil
+			}
+		}
+
+		// If all strategies failed return: res + error from primaryStrategy
+		return types.OSResult{DetectedOS: OSres}, err
 	}
 }

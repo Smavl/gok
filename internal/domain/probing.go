@@ -10,6 +10,7 @@ import (
 type ProbingOptions struct {
 	ProbingMode   ProbingMode
 	DisableProber bool
+	// TODO: thread the cli flag into the logic of the prober
 	// TimeoutPerOperation time.Duration
 }
 

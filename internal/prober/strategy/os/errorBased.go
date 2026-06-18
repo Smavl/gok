@@ -25,11 +25,11 @@ func NewOSErrorDetectionStrategy() *OSErrorDetectionStrategy {
 // supports usage like:
 // hasErrorPattern(output, "not recognized", "is not recognized"):
 func hasErrorPattern(lines []string, patterns ...string) bool {
-	// join strings
-	input := strings.Join(lines, "\n")
+	// join strings and normalize to lower
+	input := strings.ToLower(strings.Join(lines, "\n"))
 	
 	for _, pattern := range patterns {
-		if strings.Contains(input, pattern) {
+		if strings.Contains(input, strings.ToLower(pattern)) {
 			return true
 		}
 	}
@@ -55,12 +55,12 @@ func inferOsByError(output []string) (types.OS, error) {
 
 func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess types.SessionInterface) (types.OS, error) {
 	// random shell command / builtin / binary
-	rcmd := rand.Text()[:8] + "\n"
+	rcmd := rand.Text()[:8]
 	cmd := fmt.Sprintf("%s 2>&1", rcmd)
 
 	output, err := s.executor.Execute(ctx, sess, cmd)
 	if err != nil {
-		return types.UnknownOS, fmt.Errorf("failed to execute which command: %w", err)
+		return types.UnknownOS, fmt.Errorf("failed to execute OS command: %w", err)
 	}
 
 	OS, err := inferOsByError(output)

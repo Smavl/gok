@@ -21,15 +21,18 @@ func newWindowsBuilder(mode domain.ProbingMode) OSPhaseBuilder {
 type windowsDefaultPhaseBuilder struct{}
 
 func (b *windowsDefaultPhaseBuilder) BuildInitialPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
-	panic("not implemented")
+	return nil, false
+	// panic("not implemented")
 }
 
 func (b *windowsDefaultPhaseBuilder) BuildReconPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
-	panic("not implemented")
+	return nil, false
+	// panic("not implemented")
 }
 
 func (b *windowsDefaultPhaseBuilder) BuildDeepScanPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
-	panic("not implemented")
+	return nil, false
+	// panic("not implemented")
 }
 
 // ===== Windows Stealth =====
