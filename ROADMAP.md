@@ -66,7 +66,7 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [ ] Compositional design. Current one is delimiter based. 
 
 ### Bugs
-- [ ] Have to hit enter to transition from shell to menu mode (and vice versa)
+- [x] Have to hit enter to transition from shell to menu mode (and vice versa)
 - [ ] ...
 
 ### Logging:
@@ -86,8 +86,8 @@ To plan a little ahead below are goals of the next development iterations of `go
 - [ ] Better strategies: like: `which` -> better BinaryCheckStrategy (multiple in one command) (check if base64 before maybe too)
 - [x] Modes:
     - [x] Default,
-    - [ ] Agressive
-    - [ ] Stealth
+    - [x] Agressive
+    - [x] Stealth
 
 ### UX
 - [ ] History (up, down)
@@ -139,7 +139,7 @@ Below are features that are interesting and might get implemented (+ and noted d
 - [x] Find binaries
 - [x] Modes: default, aggressive, (stealthy?)
 - [x] Probe bulder (to help modes, and strategies)
-- [ ] Add os detection to first phase
+- [x] Add os detection to first phase
 - [ ] Add `Capabilties` functionality (Some operations might require these)
 - [ ] EnumerateUser(s) 
 - [ ] Parse env
