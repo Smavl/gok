@@ -1,52 +1,42 @@
 package terminal
 
 import (
-	"os"
-
 	"github.com/smavl/gok/internal/event"
 )
 
 type InputReader interface {
-	Read() error
+	HandleByte(byte) error
 }
 
 type LineReader struct {
 	lineBuffer []byte
-	buf        [1]byte
-	outChan chan<- event.MenuCmdEvent
+	outChan    chan<- event.MenuCmdEvent
 }
 
 func NewLineReader(outChan chan<- event.MenuCmdEvent) *LineReader {
 	return &LineReader{
 		lineBuffer: []byte{},
-		outChan: outChan,
+		outChan:    outChan,
 	}
 }
 
-func (r *LineReader) Read() error {
-	n, err := os.Stdin.Read(r.buf[:])
-	if err != nil || n == 0 {
-		return err
-	}
-
+func (r *LineReader) HandleByte(b byte) error {
 	// Build line until we get \n
-	if r.buf[0] == '\n' {
+	if b == '\n' {
 		line := string(r.lineBuffer)
 		r.lineBuffer = []byte{}
 		// return event.MenuCmdEvent{Input: line}, nil
 		r.outChan <- event.MenuCmdEvent{Input: line}
-		return  nil
-	} else if r.buf[0] != '\r' { // Ignore carriage returns
-		r.lineBuffer = append(r.lineBuffer, r.buf[0])
+		return nil
+	} else if b != '\r' { // Ignore carriage returns
+		r.lineBuffer = append(r.lineBuffer, b)
 	}
 	// No complete line yet
 	return nil
 }
 
 type ByteReader struct {
-	buf [1]byte
 	outChan chan<- event.ShellByteEvent
-	
 }
 
 func NewByteReader(outChan chan<- event.ShellByteEvent) *ByteReader {
@@ -55,11 +45,7 @@ func NewByteReader(outChan chan<- event.ShellByteEvent) *ByteReader {
 	}
 }
 
-func (r *ByteReader) Read() error {
-	n, err := os.Stdin.Read(r.buf[:])
-	if err != nil || n == 0 {
-		return  err
-	}
-	r.outChan <- event.ShellByteEvent{Byte: r.buf[0]}
+func (r *ByteReader) HandleByte(b byte) error {
+	r.outChan <- event.ShellByteEvent{Byte: b}
 	return nil
 }

@@ -35,7 +35,6 @@ func (ch *CommandHandler) listSessions() {
 			ch.terminal.Message("\t[%d] %s\n", sess.ID, sess.Addr)
 		}
 	}
-	defer ch.terminal.Prompt()
 
 }
 func (ch *CommandHandler) listListeners() {
@@ -48,7 +47,6 @@ func (ch *CommandHandler) listListeners() {
 			ch.terminal.Message("- %v\n", addr)
 		}
 	}
-	defer ch.terminal.Prompt()
 }
 func (ch *CommandHandler) interact(args []string) {
 	// check if session arg is supplied
@@ -56,7 +54,6 @@ func (ch *CommandHandler) interact(args []string) {
 		id, err := strconv.Atoi(args[1])
 		if err != nil {
 			ch.terminal.Message("Id: %v is not a number\n", id)
-			ch.terminal.Prompt()
 			return
 		}
 
@@ -66,12 +63,10 @@ func (ch *CommandHandler) interact(args []string) {
 			ch.shellMode.Enter(session)
 		} else {
 			ch.terminal.Message("Session #%d not found\n", id)
-			ch.terminal.Prompt()
 		}
 
 	} else {
 		ch.terminal.Message("[!] No session chosen, or invalid argument\n")
-		ch.terminal.Prompt()
 	}
 }
 
@@ -141,7 +136,7 @@ func (ch *CommandHandler) Execute(input string) {
 	default:
 		// TODO: Add help suggestion
 		ch.terminal.Message("[!] Unknown command: %s\n", subCmd)
-		ch.terminal.Message(`[+] Type "help" to see available commands.`)
+		ch.terminal.Message("[+] Type \"help\" to see available commands.\n")
 	}
 
 	ch.terminal.Prompt()

@@ -37,8 +37,8 @@ func (m *RawShellMode) Enter(s domain.Session) {
 
 	m.terminal.SetRaw()
 	s.Foreground()
-	m.im.SwapReader(NewByteReader(m.shellCh))
 	s.Write([]byte{'\n'})
+	m.im.SwapReader(NewByteReader(m.shellCh))
 }
 
 func (m *RawShellMode) GetActiveSessionId() int {
