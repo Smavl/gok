@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"io"
 	"os"
 	"sync"
 )
@@ -11,6 +12,7 @@ type InputManagerImpl struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	reader InputReader
+	input  io.Reader
 	wg     sync.WaitGroup
 }
 
@@ -22,8 +24,14 @@ type InputManager interface {
 }
 
 func NewInputManager(initialInputRead InputReader) *InputManagerImpl {
+	return NewInputManagerWithInput(initialInputRead, os.Stdin)
+}
+
+// To make testing easier, allow to supply
+func NewInputManagerWithInput(initialInputRead InputReader, input io.Reader) *InputManagerImpl {
 	return &InputManagerImpl{
 		reader: initialInputRead,
+		input:  input,
 	}
 }
 
@@ -37,7 +45,7 @@ func (im *InputManagerImpl) Start(ctx context.Context) {
 	go im.run()
 }
 
-func (im *InputManagerImpl) Stop() {
+func (im *InputManagerImpl) RequestStop() {
 	im.mu.Lock()
 
 	if im.cancel != nil {
@@ -62,7 +70,7 @@ func (im *InputManagerImpl) run() {
 		default:
 		}
 
-		n, err := os.Stdin.Read(buf[:])
+		n, err := im.input.Read(buf[:])
 		if err != nil || n == 0 {
 			continue
 		}

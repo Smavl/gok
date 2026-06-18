@@ -176,7 +176,7 @@ func (c *Core) Shutdown() {
 		c.cancel()
 	}
 
-	c.InputMan.Stop()
+	c.InputMan.RequestStop()
 
 	for _, sess := range c.SessionManager.GetSessions() {
 		sess.Stop()
