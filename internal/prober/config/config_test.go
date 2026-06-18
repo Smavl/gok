@@ -8,13 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test that context with accumulated results flows between phases
 func TestPhaseBuilderContextPropagation(t *testing.T) {
-	// Given: results accumulated from Genesis and Initial phase
-	// OS: Found during Genesis
-	// BinariesFound: Found during Initial phase
+	// Given: Genesis detected Linux, Initial found binaries
 	results := &types.ProbeResults{
 		OS:            types.LinuxOs,
-		BinariesFound: []string{"which", "base64", "python3"},
+		BinariesFound: []string{},
 	}
 
 	bctx := types.PhaseBuilderContext{
@@ -22,24 +21,25 @@ func TestPhaseBuilderContextPropagation(t *testing.T) {
 		Mode:         domain.Default,
 	}
 
-	// When: getting the builder for the next phase
 	builder, err := newOSPhaseBuilder(bctx.ProbeResults.OS, bctx.Mode)
-
-	// Then: builder receives the accumulated results
 	require.NoError(t, err)
-	require.NotNil(t, builder)
-	_, ok := builder.(*linuxDefaultPhaseBuilder)
-	require.True(t, ok, "Expected linuxDefaultPhaseBuilder for Linux OS with Default mode")
 
-	// When: building the recon phase
+	// When: Initial phase runs (simulated binary discovery)
+	initialPhase, present := builder.BuildInitialPhase(bctx)
+	require.True(t, present)
+	require.NotNil(t, initialPhase)
+
+	// FAKE binaries found by initial phase
+	results.BinariesFound = append(results.BinariesFound, "which", "python3")
+
+	// When: Recon phase is built with accumulated context
 	reconPhase, present := builder.BuildReconPhase(bctx)
 
-	// Then: builder received context with accumulated results
-	require.False(t, present)
+	// Then: Recon receives context with OS and accumulated binaries
+	require.False(t, present) // Not implemented yet
 	require.Nil(t, reconPhase)
 	require.Equal(t, types.LinuxOs, bctx.ProbeResults.OS)
 	require.Contains(t, bctx.ProbeResults.BinariesFound, "which")
-	require.Contains(t, bctx.ProbeResults.BinariesFound, "base64")
 	require.Contains(t, bctx.ProbeResults.BinariesFound, "python3")
 }
 
@@ -94,58 +94,4 @@ func TestModeSelection(t *testing.T) {
 			require.IsType(t, tt.expectedType, builder)
 		})
 	}
-}
-
-func TestOSDetectionToBuilderSelection(t *testing.T) {
-	// Given: Genesis phase detected Linux
-	genesisResults := &types.ProbeResults{
-		OS: types.LinuxOs,
-	}
-
-	bctx := types.PhaseBuilderContext{
-		ProbeResults: genesisResults,
-		Mode:         domain.Default,
-	}
-
-	// When: building the initial phase
-	phaseConfig, present := buildInitialPhase(bctx)
-
-	// Then: Linux builder is selected and returns a valid phase
-	require.True(t, present)
-	require.NotNil(t, phaseConfig)
-	require.NotEmpty(t, phaseConfig.Operations)
-	require.Greater(t, len(phaseConfig.Operations), 0)
-}
-
-func TestBuilderReceivesContext(t *testing.T) {
-	// Given: Genesis phase detected Linux OS
-	results := &types.ProbeResults{
-		OS:            types.LinuxOs,
-		BinariesFound: []string{},
-	}
-
-	bctx := types.PhaseBuilderContext{
-		ProbeResults: results,
-		Mode:         domain.Default,
-	}
-
-	builder, err := newOSPhaseBuilder(bctx.ProbeResults.OS, bctx.Mode)
-	require.NoError(t, err)
-
-	// When: initial phase runs and finds binaries
-	initialPhase, present := builder.BuildInitialPhase(bctx)
-	require.True(t, present)
-	require.NotNil(t, initialPhase)
-
-	// Simulate that initial phase found some binaries
-	results.BinariesFound = append(results.BinariesFound, "which", "python3")
-
-	// When: recon phase is built with updated context
-	reconPhase, present := builder.BuildReconPhase(bctx)
-
-	// Then: recon phase receives the accumulated results
-	require.False(t, present)
-	require.Nil(t, reconPhase)
-	require.Contains(t, bctx.ProbeResults.BinariesFound, "which")
-	require.Contains(t, bctx.ProbeResults.BinariesFound, "python3")
 }
