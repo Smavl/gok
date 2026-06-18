@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"time"
+
+	"github.com/smavl/gok/internal/domain"
 )
 
 // SessionInterface defines the minimal interface that prober needs from a session
@@ -90,7 +92,7 @@ type PhaseConfig struct {
 
 type PhaseBuilderContext struct {
 	ProbeResults	*ProbeResults
-	// Mode			ProbingMode
+	Mode			domain.ProbingMode
 	// Capabilities Capabilities
 }
 
@@ -98,8 +100,6 @@ type PhaseBuilderContext struct {
 type PhaseBuilder func(PhaseBuilderContext) (*PhaseConfig, bool)
 
 type ProbeConfig struct {
-	// Phases map[ProbePhase]PhaseConfig
-
 	// First static phase (e.g. OS detection)
 	Genesis PhaseConfig
 

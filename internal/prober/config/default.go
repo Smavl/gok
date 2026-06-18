@@ -5,7 +5,7 @@ import (
 
 	"github.com/smavl/gok/internal/prober/operations"
 	"github.com/smavl/gok/internal/prober/strategy"
-	"github.com/smavl/gok/internal/prober/strategy/binary"
+	// "github.com/smavl/gok/internal/prober/strategy/binary"
 	"github.com/smavl/gok/internal/prober/strategy/os"
 	"github.com/smavl/gok/internal/prober/types"
 )
@@ -29,48 +29,43 @@ func DefaultConfig() types.ProbeConfig {
 	defaultConfig := types.ProbeConfig{
 		Genesis: genesisPhase,
 		Phases: map[types.ProbePhase]types.PhaseBuilder{
-			types.PhaseInitial: buildInitialPhase,
-			// types.PhaseRecon:   reconPhase,
-			// types.PhaseDeepScan: deepScanPhase,
+			types.PhaseInitial:		buildInitialPhase,
+			types.PhaseRecon:		buildReconPhase,
+			types.PhaseDeepScan:	buildDeepScanPhase,
 		},
 	}
 
 	return defaultConfig
 }
 
-func buildInitialPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
 
-	switch bctx.ProbeResults.OS {
-	case types.LinuxOs:
-		return buildLinuxInitialPhase(bctx)
-	case types.WindowsOs:
-		return buildWindowsInitialPhase(bctx)
-	default:
-		// OS not detected or unsupported, skip this phase
+func buildInitialPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
+	builder, err := newOSPhaseBuilder(bctx.ProbeResults.OS, bctx.Mode)
+	if err != nil {
+		// ERROR: failed to get os phase builder
 		return nil, false
 	}
+
+	return builder.BuildInitialPhase(bctx)
 }
 
-func buildLinuxInitialPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
-
-	basicBinaries:= []string{
-		"which", "base64", 
-		"python", "python3", 
+func buildReconPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
+	builder, err := newOSPhaseBuilder(bctx.ProbeResults.OS, bctx.Mode)
+	if err != nil {
+		// ERROR: failed to get os phase builder
+		return nil, false
 	}
 
-	return &types.PhaseConfig{
-		Operations: []types.ProbeOperation{
-			operations.EnumerateBinaries(
-				basicBinaries,
-				binary.NewWhichStrategy(),
-				[]strategy.BinaryCheckStrategy{},
-				),
-		},
-		TimeoutPerOp: 500 * time.Millisecond,
-	}, true
+	return builder.BuildReconPhase(bctx)
 }
 
-func buildWindowsInitialPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
-	panic("windows initial phase not implemented yet")
+func buildDeepScanPhase(bctx types.PhaseBuilderContext) (*types.PhaseConfig, bool) {
+	builder, err := newOSPhaseBuilder(bctx.ProbeResults.OS, bctx.Mode)
+	if err != nil {
+		// ERROR: failed to get os phase builder
+		return nil, false
+	}
+
+	return builder.BuildDeepScanPhase(bctx)
 }
 

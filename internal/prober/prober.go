@@ -13,6 +13,7 @@ type Prober struct {
 	sess    types.SessionInterface
 	config  types.ProbeConfig
 	results *types.ProbeResults
+	mode	domain.ProbingMode
 	done bool
 }
 
@@ -25,6 +26,7 @@ func NewProber(sess types.SessionInterface, opts domain.ProbingOptions) (*Prober
 		sess:    sess,
 		config:  cfg,
 		results: &types.ProbeResults{},
+		mode: opts.ProbingMode,
 		done: false,
 	}, nil
 }
@@ -40,6 +42,7 @@ func (p *Prober) IsDone() bool {
 func newPhaseBuilderContext(p *Prober) types.PhaseBuilderContext {
 	return types.PhaseBuilderContext{
 		ProbeResults: p.results,
+		Mode: p.mode,
 	}
 }
 

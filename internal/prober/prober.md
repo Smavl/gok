@@ -30,6 +30,25 @@ At the moment the prober is only triggered when the shell lands and the session 
 
 The prober should also provide the user with some capabilties of the specific session to convey limitations and opportunities. Like how can exfiltration and file transfer be done? Only via in-process base64 conversion, or also via a curl-based approach, which could be better for bigger files. Capabilties also should help `gok` know which utilities and execution of payloads are possible, and improve flexibility in terms of turning to fallbacks if needed.
 
+## Phases 
+
+Current plan for the phases:
+
+**Stealth**
+- Only gain enough information about the target to upgrade the shell (e.g. python, script, socat)
+- Phases run: Intial phase, weak recon phase
+**Default**
+- Gain information about:
+    - Regarding tools to upgrade the shell
+    - Exfiltration tools
+    - ...
+
+- Phases run: Intial phase, recon phase, weak deep phase
+**Agressive**
+- TDB
+- Run automatic exploitation
+- Phases run: Intial phase, recon phase, deep phase
+
 ## Purpose
 
 The purpose of the prober is to gather information about the target system.
