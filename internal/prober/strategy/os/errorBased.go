@@ -56,7 +56,6 @@ func inferOsByError(output []string) (types.OS, error) {
 func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess types.SessionInterface) (types.OS, error) {
 	// random shell command / builtin / binary
 	rcmd := rand.Text()[:8]
-	fmt.Printf("[DEBUG] Generated random command: %q\n", rcmd)
 	cmd := fmt.Sprintf("%s 2>&1", rcmd)
 
 	output, err := s.executor.Execute(ctx, sess, cmd)
@@ -64,12 +63,9 @@ func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess types.S
 		return types.UnknownOS, fmt.Errorf("failed to execute OS command: %w", err)
 	}
 
-	// DEBUG: Print what we got
-	fmt.Printf("[DEBUG] OS Detection output: %v\n", output)
 
 	OS, err := inferOsByError(output)
 	if err != nil {
-		fmt.Printf("[DEBUG] OS Detection failed: %v\n", err)
 		return types.UnknownOS, err
 	}
 
