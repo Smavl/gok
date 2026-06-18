@@ -40,13 +40,13 @@ To plan a little ahead below are goals of the next development iterations of `go
 - [x] CLI flags
     - [x] Probing flags (modes)
     - [x] Probing flags (disable)
-- [ ] Prober 
+- [x] Prober 
     - [x] ProbeBuilder
     - [x] Modes (Default, Agressive, stealth) - Added but not completed
-    - [ ] Timeout flags into mode (or more?)
+    - [~] Timeout flags into mode (or more?)
     - [x] Add Default probe config (Operations)
-    - [ ] Add back OS detection?
-    - [ ] Finish Default probe config (Operations), at least some okay state
+    - [x] Add back OS detection?
+    - [x] Finish Default probe config (Operations), at least some okay state
 
 ## Version 0.3 - Shell upgrading
 - [ ] Automatic shell upgrading 
