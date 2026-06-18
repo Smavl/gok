@@ -98,12 +98,21 @@ func generateDelimiter() string {
 // containsDelimiter checks if delimiter is present in any line
 func containsDelimiter(lines []string, delimiter string) bool {
 	for _, line := range lines {
-		if strings.Contains(line, delimiter) {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == delimiter {
 			return true
 		}
 	}
 	return false
 }
+// func containsDelimiter(lines []string, delimiter string) bool {
+// 	for _, line := range lines {
+// 		if strings.Contains(line, delimiter) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 // parseExitCode extracts exit code from command output
 func parseExitCode(lines []string, delimiter string) (int, error) {
