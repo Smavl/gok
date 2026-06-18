@@ -129,7 +129,7 @@ func (l *Listener) acceptLoop(sm *SessionManager, terminal domain.TerminalContro
 			eventChan <- event.NewSessionEvent{
 				SessionID:   session.ID,
 				SessionAddr: session.Addr,
-				SystemOS:    session.SystemInfo.OS.String(),
+				SystemOS:    session.SessionInfo.OS.String(),
 			}
 		}
 	}

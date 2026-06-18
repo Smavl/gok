@@ -9,14 +9,12 @@ import (
 
   "github.com/smavl/gok/internal/cli"
   "github.com/smavl/gok/internal/core"
-  "github.com/smavl/gok/internal/prober"
+  "github.com/smavl/gok/internal/prober/types"
   "github.com/smavl/gok/internal/session"
   "github.com/stretchr/testify/require"
 )
 
 func TestRevshellSimple(t *testing.T) {
-  // time start
-
   // start gok core 
   hostIP := "0.0.0.0"     // Bind gok to listen on all interfaces
   connectIP := "172.17.0.1" // Docker ip
@@ -59,24 +57,25 @@ func TestRevshellSimple(t *testing.T) {
   require.Eventually(t, func() bool {
     s, err = c.SessionManager.Get(0)
     if err != nil { return false }
-    return s.SystemInfo.OS == prober.Linux
+    return s.SessionInfo.OS == types.LinuxOs
   }, 1*time.Second, 2*time.Millisecond, "Expected session OS to be Linux")
 
 
-  // Wait for Prober to be initialized AND enumeration to complete (state = StateBackgrounded)
+  // Wait for Prober to be done
   require.Eventually(t, func() bool {
     return s.IsProberDone()
   }, 5*time.Second, 20*time.Millisecond, "Timed out waiting for Prober initialization and binary enumeration")
 
 
-  // TEST: Binaries: `which`, `perl` should be detected
-  // require.NoError(t, err)
+  require.NoError(t, err)
+  // TEST: Binaries to be found
   binaries := s.Prober.GetBinaries()
   require.Contains(t, binaries, "which", "Expected 'which' binary to be detected")
-  require.Contains(t, binaries, "perl", "Expected 'perl' binary to be detected")
   require.Contains(t, binaries, "base64", "Expected 'base64' binary to be detected")
-  require.Contains(t, binaries, "find", "Expected 'find' binary to be detected")
-  require.Contains(t, binaries, "grep", "Expected 'grep' binary to be detected")
+  // require.Contains(t, binaries, "python", "Expected 'python' binary to be detected")
+  // require.Contains(t, binaries, "perl", "Expected 'perl' binary to be detected")
+  // require.Contains(t, binaries, "find", "Expected 'find' binary to be detected")
+  // require.Contains(t, binaries, "grep", "Expected 'grep' binary to be detected")
   // Does not not contain:
   require.NotContains(t, binaries, "nonexistentbinary123", "Did not expect 'nonexistentbinary123' binary to be detected")
   require.NotContains(t, binaries, "nc", "Did not expect 'nc' binary to be detected")

@@ -39,9 +39,14 @@ To plan a little ahead below are goals of the next development iterations of `go
 ## Version 0.2 - Prober modes
 - [x] CLI flags
     - [x] Probing flags (modes)
+    - [x] Probing flags (disable)
 - [ ] Prober 
-    - [ ] ProbeBuilder
-    - [ ] Modes (Default, Agressive, stealth)
+    - [x] ProbeBuilder
+    - [x] Modes (Default, Agressive, stealth) - Added but not completed
+    - [ ] Timeout flags into mode (or more?)
+    - [x] Add Default probe config (Operations)
+    - [ ] Add back OS detection?
+    - [ ] Finish Default probe config (Operations), at least some okay state
 
 ## Version 0.3 - Shell upgrading
 - [ ] Automatic shell upgrading 
@@ -56,6 +61,13 @@ To plan a little ahead below are goals of the next development iterations of `go
 - [ ] Add domain interfaces to be used other places?
 - [ ] Workaround: `IsProberDone`
 - [ ] Too many concerns: `outputLoop`
+- [ ] Executor:
+    - [ ] Factor out from probe folder?
+    - [ ] Compositional design. Current one is delimiter based. 
+
+### Bugs
+- [ ] Have to hit enter to transition from shell to menu mode (and vice versa)
+- [ ] ...
 
 ### Logging:
 - [ ] Debugging- and/or general logs
@@ -70,12 +82,14 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [ ] inside active shell to run payloads and 
 
 ### Prober
-- [ ] Prober Builder
-- [ ] Prober (linux)
-    - [ ] EnumerateUser
-    - [ ] EnumerateUsers
+- [x] Prober Builder
+- [ ] Better strategies: like: `which` -> better BinaryCheckStrategy (multiple in one command) (check if base64 before maybe too)
+- [x] Modes:
+    - [x] Default,
+    - [ ] Agressive
+    - [ ] Stealth
 
-### Main menu 
+### UX
 - [ ] History (up, down)
 - [ ] Tab completion
 - [ ] Session details (info from the prober?)
@@ -84,11 +98,12 @@ To plan a little ahead below are goals of the next development iterations of `go
 ## Version 1.0 - Goals
 
 - Useable for a HTB box
+- Better UX
 - Windows Prober (at least basic)
 - All modes: Menu, Shell, Meta-mode
 - Little to none technical debt
 - Okay testing suite: Unit + Integration
-- Modules: 
+- (Meta-mode) Modules: 
     - Basic modules: File upload/download
     - extendability
 
@@ -110,8 +125,11 @@ Below are features that are interesting and might get implemented (+ and noted d
     - [ ] php
     - [ ] (socat thingy)
     - [ ] ...
+- [ ] Connectivity:
+    - [ ] Bind shell / reconnect thingy
+    - [ ] Spawn another session
 - [ ] Dynamic
-    - [ ] Terminal resizing
+    - [ ] Terminal resizing (ssty, row & cols)
 - [ ] Meta-mode 
     - [ ] Escape feature (from shell)
 
@@ -119,11 +137,17 @@ Below are features that are interesting and might get implemented (+ and noted d
 
 - [x] Detect `which` binary
 - [x] Find binaries
+- [x] Modes: default, aggressive, (stealthy?)
+- [x] Probe bulder (to help modes, and strategies)
+- [ ] Add os detection to first phase
+- [ ] Add `Capabilties` functionality (Some operations might require these)
 - [ ] EnumerateUser(s) 
 - [ ] Parse env
-- [ ] Modes: default, aggressive, (stealthy?)
-- [ ] Probe bulder (to help modes, and strategies)
 - [ ] Fingerprinting
+
+### Prober - Executor 
+- [x] Delimiter based
+- [ ] Add more strategies 
 
 ## Menu mode
 
@@ -189,7 +213,6 @@ Below are features that are interesting and might get implemented (+ and noted d
 
 ## To be ordered features
 
-- [ ] Bind shell / reconnect thingy
 - [ ] SSH 
     - [ ] SSH key enumerator
     - [ ] SSH key injector (`echo ... >> PATH/.ssh/authorized_keys`)

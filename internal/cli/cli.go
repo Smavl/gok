@@ -16,6 +16,7 @@ var Flags struct {
 	// timeout flags
 	ProbingCmdTimeout time.Duration `help:"Timeout for probing commands" default:"200ms" short:"t"`
 	ProbingMode domain.ProbingMode `help:"Level of agressiveness for the prober" default:"0" short:"A"`
+	DisableProber bool `help:"Disable the prober" default:"false" short:"D"`
 }
 
 type Config struct {
@@ -25,6 +26,8 @@ type Config struct {
 	// probing config
 	ProbingCmdTimeout time.Duration
 	ProbingMode       domain.ProbingMode
+	// TODO: add logic validation
+	DisableProber     bool
 
 	// misc
 	// TODO: testmode/headless mode

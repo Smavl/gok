@@ -7,6 +7,13 @@ import (
 	"github.com/alecthomas/kong"
 )
 
+type ProbingOptions struct {
+	ProbingMode   ProbingMode
+	DisableProber bool
+	// TODO: thread the cli flag into the logic of the prober
+	// TimeoutPerOperation time.Duration
+}
+
 type ProbingMode int
 
 const (

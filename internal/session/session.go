@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/misc"
 	"github.com/smavl/gok/internal/prober"
+	"github.com/smavl/gok/internal/prober/types"
 )
 
 type SessionState int
@@ -70,9 +72,13 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 	}
 }
 
-type SystemInfo struct {
-	OS prober.OS
+type SessionInfo struct {
+	OS types.OS
+	binaries []string
 }
+// type SystemInfo struct {
+// 	OS types.OS
+// }
 
 type Session struct {
 	ID   int
@@ -87,9 +93,9 @@ type Session struct {
 	// probing
 	probingBuffer      *HistoryLineBuffer
 	probingDataArrived chan struct{}
-	SystemInfo         SystemInfo
-	Prober             prober.Prober
-	probeOpts          prober.ProberOptions
+	SessionInfo         SessionInfo
+	Prober             *prober.Prober
+	ProbingOptions domain.ProbingOptions
 
 	// context things
 	ctx    context.Context
@@ -102,17 +108,18 @@ func (s *Session) GetID() int {
 }
 
 type SessionManager struct {
-	mu        sync.RWMutex
-	currentID int
-	sessions  map[int]*Session
-	probeOpts prober.ProberOptions
+	mu          sync.RWMutex
+	currentID   int
+	sessions    map[int]*Session
+	probOpts domain.ProbingOptions 
 }
 
-func NewSessionManager(probeOpts prober.ProberOptions) *SessionManager {
+func NewSessionManager(probingOpts domain.ProbingOptions) *SessionManager {
 	return &SessionManager{
-		currentID: 0,
-		sessions:  make(map[int]*Session),
-		probeOpts: probeOpts,
+		currentID:   0,
+		sessions:    make(map[int]*Session),
+		probOpts: probingOpts,
+		// ProbingOpTimout: probingOpTimeout,
 	}
 }
 
@@ -126,15 +133,16 @@ func (sm *SessionManager) incID() int {
 
 func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session, error) {
 	session := Session{
-		ID:                sm.incID(),
-		conn:              conn,
-		Addr:              conn.RemoteAddr().String(),
-		display:           display,
-		history:           CreateLineBuffer(defaultHistoryMaxLines),
-		probingBuffer:     CreateLineBuffer(defaultHistoryMaxLines),
+		ID:                 sm.incID(),
+		conn:               conn,
+		Addr:               conn.RemoteAddr().String(),
+		display:            display,
+		history:            CreateLineBuffer(defaultHistoryMaxLines),
+		probingBuffer:      CreateLineBuffer(defaultHistoryMaxLines),
 		probingDataArrived: make(chan struct{}),
-		SystemInfo:        SystemInfo{},
-		probeOpts:         sm.probeOpts,
+		SessionInfo:         SessionInfo{},
+		// probingMode:        sm.probOpts.ProbingMode,
+		ProbingOptions:   sm.probOpts,
 	}
 
 	sm.mu.Lock()
@@ -195,39 +203,65 @@ func (s *Session) Start(ctx context.Context) error {
 	go s.outputLoop()
 
 	// NOTE: probing session has to happen after outputLoop is initialized
-	s.probeSession()
+	if s.ProbingOptions.DisableProber {
+		// TODO: Add error?
+		return nil
+	}
+
+	err := s.probeSession()
+	if err != nil {
+		return fmt.Errorf("failed to probe session: %w", err)
+	}
 	return nil
 }
 
 func (s *Session) probeSession() error {
 	s.mu.Lock()
-	s.state = StateProbing
+	s.setState(StateProbing)
 	s.mu.Unlock()
 
-	// get os
-	rcmds := prober.RandomCommandStrategy{CmdTimeout: s.probeOpts.CmdTimeout}
-	OS, err := rcmds.DetermineOS(s)
-	if err != nil {
-		return err
-	}
-	s.SystemInfo.OS = OS
+	// For now when both the prober is sucessfully run, or fails set the state to Backgrounded
+	defer func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.setState(StateBackgrounded)
+	}()
 
-	// Fetch binaries
-	prober, err := OS.GetNewProber(s, s.probeOpts)
+	// Create prober with configured mode
+	prober, err := prober.NewProber(s, s.ProbingOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create prober: %w", err)
 	}
+
 	s.mu.Lock()
 	s.Prober = prober
 	s.mu.Unlock()
 
-	prober.EnumerateBinaries()
+	// Either "terminate" when the prober is done, or after timeout
+	probingTimeout := 30 * time.Second
+	ctx, cancel := context.WithTimeout(s.ctx, probingTimeout)
+	defer cancel()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.state = StateBackgrounded
+	err = prober.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("probing failed: %w", err)
+	}
+
+	pres, err := prober.GetProbingResultsIfDone()
+	if err != nil {
+		return fmt.Errorf("Prober was not done or failed to get probing results: %w", err)
+	}
+	s.consumeProbingResults(pres)
+
 
 	return nil
+}
+
+func (s *Session) consumeProbingResults(pr *types.ProbeResults) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SessionInfo.OS = pr.OS
+	s.SessionInfo.binaries = pr.BinariesFound
 }
 
 func (s *Session) GetProbingLines() []string {
@@ -243,7 +277,7 @@ func (s *Session) GetProbingDataChannel() <-chan struct{} {
 func (s *Session) IsProberDone() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state == StateBackgrounded && s.Prober != nil
+	return s.Prober != nil && s.Prober.IsDone()
 }
 
 func (s *Session) ClearProbingBuffer() {
@@ -287,7 +321,7 @@ func (s *Session) outputLoop() {
 
 			// other must be normal error:
 			s.mu.Lock()
-			s.state = StateDead
+			s.setState(StateDead)
 			s.mu.Unlock()
 			return
 		}
@@ -336,7 +370,7 @@ func (s *Session) Write(p []byte) (int, error) {
 func (s *Session) Foreground() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.state = StateActive
+	s.setState(StateActive)
 
 	if len(s.history.lines) > 0 {
 		s.display.Write([]byte(string("[*] Resuming session...\n")))
@@ -347,11 +381,16 @@ func (s *Session) Foreground() {
 	}
 }
 
+// The caller should lock themselves
+func (s *Session) setState(state SessionState) {
+	s.state = state
+}
+
 func (s *Session) Background() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.state != StateDead {
-		s.state = StateBackgrounded
+		s.setState(StateBackgrounded)
 	}
 }
 
@@ -361,7 +400,7 @@ func (s *Session) Stop() {
 		s.mu.Unlock()
 		return
 	}
-	s.state = StateDead
+	s.setState(StateDead)
 	if s.cancel != nil {
 		s.cancel()
 	}
