@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	// "os"
 	"strings"
 	"sync"
 	"time"
@@ -73,9 +74,10 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 }
 
 type SessionInfo struct {
-	OS types.OS
-	binaries []string
+	OS       types.OS
+	binaries []types.BinaryResult
 }
+
 // type SystemInfo struct {
 // 	OS types.OS
 // }
@@ -93,9 +95,9 @@ type Session struct {
 	// probing
 	probingBuffer      *HistoryLineBuffer
 	probingDataArrived chan struct{}
-	SessionInfo         SessionInfo
+	SessionInfo        SessionInfo
 	Prober             *prober.Prober
-	ProbingOptions domain.ProbingOptions
+	ProbingOptions     domain.ProbingOptions
 
 	// context things
 	ctx    context.Context
@@ -108,17 +110,17 @@ func (s *Session) GetID() int {
 }
 
 type SessionManager struct {
-	mu          sync.RWMutex
-	currentID   int
-	sessions    map[int]*Session
-	probOpts domain.ProbingOptions 
+	mu        sync.RWMutex
+	currentID int
+	sessions  map[int]*Session
+	probOpts  domain.ProbingOptions
 }
 
 func NewSessionManager(probingOpts domain.ProbingOptions) *SessionManager {
 	return &SessionManager{
-		currentID:   0,
-		sessions:    make(map[int]*Session),
-		probOpts: probingOpts,
+		currentID: 0,
+		sessions:  make(map[int]*Session),
+		probOpts:  probingOpts,
 		// ProbingOpTimout: probingOpTimeout,
 	}
 }
@@ -140,9 +142,9 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 		history:            CreateLineBuffer(defaultHistoryMaxLines),
 		probingBuffer:      CreateLineBuffer(defaultHistoryMaxLines),
 		probingDataArrived: make(chan struct{}),
-		SessionInfo:         SessionInfo{},
+		SessionInfo:        SessionInfo{},
 		// probingMode:        sm.probOpts.ProbingMode,
-		ProbingOptions:   sm.probOpts,
+		ProbingOptions: sm.probOpts,
 	}
 
 	sm.mu.Lock()
@@ -191,7 +193,6 @@ func (sm *SessionManager) Get(ID int) (*Session, error) {
 	return sesh, nil
 }
 
-
 // At this point the shell has landed
 func (s *Session) Start(ctx context.Context) error {
 	s.mu.Lock()
@@ -212,7 +213,16 @@ func (s *Session) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to probe session: %w", err)
 	}
+
+	// prober has run, we can upgrade the shell at this point
+
+	s.upgradeShell()
+
 	return nil
+}
+
+func (s *Session) upgradeShell() {
+
 }
 
 func (s *Session) probeSession() error {
@@ -253,7 +263,6 @@ func (s *Session) probeSession() error {
 	}
 	s.consumeProbingResults(pres)
 
-
 	return nil
 }
 
@@ -261,7 +270,7 @@ func (s *Session) consumeProbingResults(pr *types.ProbeResults) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.SessionInfo.OS = pr.OS
-	s.SessionInfo.binaries = pr.BinariesFound
+	s.SessionInfo.binaries = pr.BinariesFound.Binaries
 }
 
 func (s *Session) GetProbingLines() []string {

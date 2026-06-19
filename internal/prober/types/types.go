@@ -57,12 +57,20 @@ func (r OSResult) Apply(pr *ProbeResults){
 	pr.OS = r.DetectedOS
 }
 
-type BinariesResult struct {
-	Binaries []string
+// func ()
+
+type BinaryResults struct {
+	Binaries []BinaryResult
 }
 
-func (r BinariesResult) Apply(pr *ProbeResults){
-	pr.BinariesFound = append(pr.BinariesFound, r.Binaries...)
+type BinaryResult struct {
+	Name string
+	Path string
+	Found bool
+}
+
+func (r BinaryResults) Apply(pr *ProbeResults){
+	pr.BinariesFound.Binaries = append(pr.BinariesFound.Binaries, r.Binaries...)
 
 	// TODO: maybe update capabilties / derived capabilties here
 }
@@ -70,7 +78,7 @@ func (r BinariesResult) Apply(pr *ProbeResults){
 type ProbeResults struct {
 	// Results []*ProbeResult
 	OS OS 
-	BinariesFound []string
+	BinariesFound BinaryResults
 
 	// future results:
 	// Users []User
@@ -79,9 +87,24 @@ type ProbeResults struct {
 	// Capabilities Capabilities
 }
 
+func (pr *ProbeResults) HasBinary(binaryName string) bool {
+	for _, b := range pr.BinariesFound.Binaries {
+		if b.Name == binaryName && b.Found {
+			return true
+		}
+	}
+	return false
+}
+
 // type Capabilities struct {
 // 	HasWhich
 // }
+
+type BinaryCapability struct {
+	Name string
+	Path string
+	// Version string
+}
 
 type ProbeOperation func(ctx context.Context, sess SessionInterface) (ProbeResult, error)
 

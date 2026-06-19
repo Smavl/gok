@@ -68,6 +68,7 @@ func (e *CommandExecutor) Execute(ctx context.Context, sess types.SessionInterfa
 
 	// Get output lines (excluding delimiter line)
 	lines := sess.GetProbingLines()
+	lines = filterDelimiterLine(lines, delimiter)
 	return filterDelimiterLine(lines, delimiter), nil
 }
 
@@ -92,7 +93,7 @@ func (e *CommandExecutor) waitForDelimiter(ctx context.Context, sess types.Sessi
 func generateDelimiter() string {
 	bytes := make([]byte, 4)
 	rand.Read(bytes)
-	return "¤" + hex.EncodeToString(bytes) + "¤"
+	return "_G" + hex.EncodeToString(bytes) + "OK"
 }
 
 // containsDelimiter checks if delimiter is present in any line

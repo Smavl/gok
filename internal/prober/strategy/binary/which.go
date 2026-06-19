@@ -3,6 +3,7 @@ package binary
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/smavl/gok/internal/prober/executor"
 	"github.com/smavl/gok/internal/prober/types"
@@ -19,17 +20,62 @@ func NewWhichStrategy() *WhichStrategy {
 	}
 }
 
-// Uses `which` to determin the existence of a binary
-func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInterface, binary string) (bool, error) {
+func PathWasReturned(s string) bool {
+	// check if starts with `/`
+	hasPrefix := strings.HasPrefix(s, "/")
+	// check that it does not start with `which: no`
+	hasNegWhichPattern := strings.HasPrefix(s, "which: no")
+
+	return hasPrefix && !hasNegWhichPattern
+}
+
+func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInterface, binary string) (types.BinaryResult, error) {
 	// Build the which command - redirect output to suppress noise
-	cmd := fmt.Sprintf("which %s >/dev/null 2>&1", binary)
+	cmd := fmt.Sprintf("which %s 2>&1", binary)
 
 	// Execute and get exit code
-	exitCode, err := s.executor.ExecuteWithExitCode(ctx, sess, cmd)
+	res, err := s.executor.Execute(ctx, sess, cmd)
 	if err != nil {
-		return false, fmt.Errorf("failed to execute which command: %w", err)
+		// something went wrong
+		return types.BinaryResult{
+			Name:  binary,
+			Found: false,
+		}, err
+	}
+	fmt.Printf("which command output for '%s': %v\n", binary, res)
+
+	// 
+	found := false
+	path := ""
+	for _, line := range res {
+		path = strings.TrimSpace(line)
+		if PathWasReturned(path) { found = true; break }
+
+	}
+
+	result := types.BinaryResult{
+		Name:  binary,
+		Path:  path,
+		Found: found,
 	}
 
 	// Exit code 0 => binary was found
-	return exitCode == 0, nil
+	return result, nil
 }
+
+
+// exit code base approach (does not return path)
+// Uses `which` to determin the existence of a binary
+// func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInterface, binary string) (bool, error) {
+// 	// Build the which command - redirect output to suppress noise
+// 	cmd := fmt.Sprintf("which %s >/dev/null 2>&1", binary)
+//
+// 	// Execute and get exit code
+// 	exitCode, err := s.executor.ExecuteWithExitCode(ctx, sess, cmd)
+// 	if err != nil {
+// 		return false, fmt.Errorf("failed to execute which command: %w", err)
+// 	}
+//
+// 	// Exit code 0 => binary was found
+// 	return exitCode == 0, nil
+// }

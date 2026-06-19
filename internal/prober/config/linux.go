@@ -16,8 +16,10 @@ func newLinuxBuilder(mode domain.ProbingMode) OSPhaseBuilder {
 		return &linuxStealthPhaseBuilder{}
 	case domain.Agressive:
 		return &linuxAggressivePhaseBuilder{}
+	case domain.Default:
+			return &linuxDefaultPhaseBuilder{}
 	default:
-		return &linuxDefaultPhaseBuilder{}
+		panic("unsupported mode for Linux OS")
 	}
 }
 
