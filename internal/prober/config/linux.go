@@ -31,6 +31,7 @@ func (b *linuxDefaultPhaseBuilder) BuildInitialPhase(bctx types.PhaseBuilderCont
 	basicBinaries := []string{
 		"which", "base64",
 		"python", "python3",
+		"bash",
 	}
 
 	initalPhase := types.PhaseConfig{

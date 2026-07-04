@@ -48,9 +48,14 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [x] Add back OS detection?
     - [x] Finish Default probe config (Operations), at least some okay state
 
-## Version 0.3 - Shell upgrading
-- [ ] Automatic shell upgrading 
-    - [ ] Simple shell upgrading implementation (python)
+## Version 0.3 - Simple Shell upgrading
+- [x] Automatic shell upgrading 
+    - [x] Simple shell upgrading implementation (python)
+    - [x] Add shell upgrading features:
+        - [x] ptyUpgradePayload logic
+        - [x] Upgrade the TTY/PTY
+        - [x] Export ENV vars
+        - [x] Set `stty` size
     - [ ] CLI flag: Automatically drop into shell (default)
 
 ## Future versions:
@@ -67,6 +72,8 @@ To plan a little ahead below are goals of the next development iterations of `go
 
 ### Bugs
 - [x] Have to hit enter to transition from shell to menu mode (and vice versa)
+- [ ] Session is not killed on target when killed in `gok`
+- [ ] Newline is not added when a new session is lands when inside a raw one ( or formatting is wrong in some other way)
 - [ ] ...
 
 ### Logging:

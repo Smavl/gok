@@ -2,9 +2,11 @@ package types
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/smavl/gok/internal/domain"
+	"github.com/smavl/gok/internal/misc"
 )
 
 // SessionInterface defines the minimal interface that prober needs from a session
@@ -69,8 +71,20 @@ type BinaryResult struct {
 	Found bool
 }
 
+type EnvResult struct {
+	BashPath string
+	// Variables map[string]string
+}
+
+func (br BinaryResult) GetPath() (string, error)  {
+	if br.Found {
+		return br.Path, nil
+	}
+	return "", fmt.Errorf("binary %s not found", br.Name)
+}
+
 func (r BinaryResults) Apply(pr *ProbeResults){
-	pr.BinariesFound.Binaries = append(pr.BinariesFound.Binaries, r.Binaries...)
+	pr.BinariesResults.Binaries = append(pr.BinariesResults.Binaries, r.Binaries...)
 
 	// TODO: maybe update capabilties / derived capabilties here
 }
@@ -78,7 +92,8 @@ func (r BinaryResults) Apply(pr *ProbeResults){
 type ProbeResults struct {
 	// Results []*ProbeResult
 	OS OS 
-	BinariesFound BinaryResults
+	BinariesResults BinaryResults
+	EnvResults EnvResult
 
 	// future results:
 	// Users []User
@@ -87,8 +102,9 @@ type ProbeResults struct {
 	// Capabilities Capabilities
 }
 
+// TODO: move
 func (pr *ProbeResults) HasBinary(binaryName string) bool {
-	for _, b := range pr.BinariesFound.Binaries {
+	for _, b := range pr.BinariesResults.Binaries {
 		if b.Name == binaryName && b.Found {
 			return true
 		}
@@ -96,6 +112,14 @@ func (pr *ProbeResults) HasBinary(binaryName string) bool {
 	return false
 }
 
+func (pr *ProbeResults) GetBinary(binaryName string) (BinaryResult, error) {
+	for _, b := range pr.BinariesResults.Binaries {
+		if b.Name == binaryName && b.Found {
+			return b, nil
+		}
+	}
+	return BinaryResult{}, misc.ErrBinaryNotFound
+}
 // type Capabilities struct {
 // 	HasWhich
 // }

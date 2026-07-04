@@ -12,7 +12,7 @@ import (
 type Prober struct {
 	sess    types.SessionInterface
 	config  types.ProbeConfig
-	Results *types.ProbeResults
+	results *types.ProbeResults
 	mode	domain.ProbingMode
 	done bool
 }
@@ -25,7 +25,7 @@ func NewProber(sess types.SessionInterface, opts domain.ProbingOptions) (*Prober
 	return &Prober{
 		sess:    sess,
 		config:  cfg,
-		Results: &types.ProbeResults{},
+		results: &types.ProbeResults{},
 		mode: opts.ProbingMode,
 		done: false,
 	}, nil
@@ -41,7 +41,7 @@ func (p *Prober) IsDone() bool {
 
 func newPhaseBuilderContext(p *Prober) types.PhaseBuilderContext {
 	return types.PhaseBuilderContext{
-		ProbeResults: p.Results,
+		ProbeResults: p.results,
 		Mode: p.mode,
 	}
 }
@@ -98,30 +98,33 @@ func (p *Prober) runPhase(ctx context.Context, cfg types.PhaseConfig) error {
 		}
 
 		// Apply whatever result respective to the operation
-		result.Apply(p.Results)
+		result.Apply(p.results)
 
 	}
 
 	return nil
 }
 
+// TODO: rework to be "whenDone"?
 func (p* Prober) GetProbingResultsIfDone() (*types.ProbeResults, error) {
 	if !p.done {
 		return nil, fmt.Errorf("probing not completed yet")
 	}
-	return p.Results, nil
+	return p.results, nil
 }
+
+// TODO: Move to be on ProbeResults instead of Prober
 
 // GetBinaries returns the list of found binaries 
 func (p *Prober) GetBinaries() []string {
 	binaries := []string{}
-	for _, b := range p.Results.BinariesFound.Binaries {
+	for _, b := range p.results.BinariesResults.Binaries {
 		binaries = append(binaries, b.Name)
 	}
 	return binaries
 }
 
-func (p *Prober) GetBinaryResult() []types.BinaryResult {
-	return p.Results.BinariesFound.Binaries
+func (p *Prober) GetBinaryResults() []types.BinaryResult {
+	return p.results.BinariesResults.Binaries
 }
 

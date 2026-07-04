@@ -42,7 +42,6 @@ func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInter
 			Found: false,
 		}, err
 	}
-	fmt.Printf("which command output for '%s': %v\n", binary, res)
 
 	// 
 	found := false

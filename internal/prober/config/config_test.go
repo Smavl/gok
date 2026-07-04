@@ -13,7 +13,8 @@ func TestPhaseBuilderContextPropagation(t *testing.T) {
 	// Given: Genesis detected Linux, Initial found binaries
 	results := &types.ProbeResults{
 		OS:            types.LinuxOs,
-		BinariesFound: types.BinaryResults{},
+		BinariesResults: types.BinaryResults{},
+		EnvResults: types.EnvResult{},
 	}
 
 	bctx := types.PhaseBuilderContext{
@@ -48,7 +49,7 @@ func TestPhaseBuilderContextPropagation(t *testing.T) {
 	require.Equal(t, types.LinuxOs, bctx.ProbeResults.OS)
 	// require.Contains(t, bctx.ProbeResults.BinariesFound, "which")
 	// require.Contains(t, bctx.ProbeResults.BinariesFound, "python3")
-	require.True(t, len(bctx.ProbeResults.BinariesFound.Binaries) > 0)
+	require.True(t, len(bctx.ProbeResults.BinariesResults.Binaries) > 0)
 	require.True(t, bctx.ProbeResults.HasBinary("which"))
 	require.True(t, bctx.ProbeResults.HasBinary("python3"))
 

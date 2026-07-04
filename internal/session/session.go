@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+
 	// "os"
 	"strings"
 	"sync"
@@ -14,6 +15,8 @@ import (
 	"github.com/smavl/gok/internal/misc"
 	"github.com/smavl/gok/internal/prober"
 	"github.com/smavl/gok/internal/prober/types"
+	"github.com/smavl/gok/internal/upgrader"
+	// "github.com/smavl/gok/internal/session"
 )
 
 type SessionState int
@@ -221,8 +224,15 @@ func (s *Session) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *Session) upgradeShell() {
+func (s *Session) upgradeShell() error {
+	results, err := s.Prober.GetProbingResultsIfDone()
+	if err != nil {
+		return fmt.Errorf("failed to get probing results for upgrade: %w", err)	
+	}
 
+	upgrader := upgrader.NewUpgrader(s, results)
+
+	return upgrader.Upgrade()
 }
 
 func (s *Session) probeSession() error {
@@ -270,7 +280,7 @@ func (s *Session) consumeProbingResults(pr *types.ProbeResults) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.SessionInfo.OS = pr.OS
-	s.SessionInfo.binaries = pr.BinariesFound.Binaries
+	s.SessionInfo.binaries = s.Prober.GetBinaryResults()
 }
 
 func (s *Session) GetProbingLines() []string {

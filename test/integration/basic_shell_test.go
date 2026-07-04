@@ -69,8 +69,6 @@ func TestRevshellSimple(t *testing.T) {
 
   require.NoError(t, err)
   // TEST: Binaries to be found
-  fmt.Printf("Binaries found: %v\n", s.Prober.GetBinaries())
-  fmt.Printf("Probe results: %+v\n", s.Prober.Results)
   binaries := s.Prober.GetBinaries()
   require.Contains(t, binaries, "which", "Expected 'which' binary to be detected")
   require.Contains(t, binaries, "base64", "Expected 'base64' binary to be detected")
