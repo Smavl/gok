@@ -27,6 +27,7 @@ const (
 	StateBackgrounded
 	StateDead
 	StateProbing
+	StateUpgrading
 	// StateIdle
 )
 
@@ -218,8 +219,15 @@ func (s *Session) Start(ctx context.Context) error {
 	}
 
 	// prober has run, we can upgrade the shell at this point
+	// TODO: make sure it is done 
 
 	s.upgradeShell()
+
+
+	// set state to background again
+	s.mu.Lock()
+	s.state = StateBackgrounded
+	s.mu.Unlock()
 
 	return nil
 }
@@ -230,7 +238,12 @@ func (s *Session) upgradeShell() error {
 		return fmt.Errorf("failed to get probing results for upgrade: %w", err)	
 	}
 
+	s.mu.Lock()
+	s.setState(StateUpgrading)
+	s.mu.Unlock()
+
 	upgrader := upgrader.NewUpgrader(s, results)
+
 
 	return upgrader.Upgrade()
 }
@@ -240,7 +253,7 @@ func (s *Session) probeSession() error {
 	s.setState(StateProbing)
 	s.mu.Unlock()
 
-	// For now when both the prober is sucessfully run, or fails set the state to Backgrounded
+	// NOTE: For now when both the prober is sucessfully run, or fails set the state to Backgrounded
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -375,6 +388,30 @@ func (s *Session) outputLoop() {
 	}
 }
 
+
+// func debugByteData(data []byte) {
+//   	// Print the string representation
+//   	fmt.Printf("[*] String: %s\n", string(data))
+//
+//   	// Print byte breakdown
+//   	var sb strings.Builder
+//   	sb.WriteString("[")
+//   	for i, b := range data {
+//   		if i > 0 {
+//   			sb.WriteString(", ")
+//   		}
+//   		// Handle printable vs non-printable characters
+//   		if b >= 32 && b <= 126 {
+//   			fmt.Fprintf(&sb, "%d -> '%c'", b, b)
+//   		} else {
+//   			// Show non-printable as just the byte value
+//   			fmt.Fprintf(&sb, "%d", b)
+//   		}
+//   	}
+//   	sb.WriteString("]\n")
+//   	fmt.Print(sb.String())
+// }
+
 // send data to the remote session
 func (s *Session) Write(p []byte) (int, error) {
 	s.mu.Lock()
@@ -385,10 +422,11 @@ func (s *Session) Write(p []byte) (int, error) {
 	return s.conn.Write(p)
 }
 
-// foregound the session to the user
+// foreground the session to the user
 func (s *Session) Foreground() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// TODO: Add state validation (state machine?)
 	s.setState(StateActive)
 
 	if len(s.history.lines) > 0 {
@@ -400,9 +438,15 @@ func (s *Session) Foreground() {
 	}
 }
 
-// The caller should lock themselves
+// NOTE: The caller should lock themselves
 func (s *Session) setState(state SessionState) {
 	s.state = state
+}
+
+
+// NOTE: The caller should lock themselves if needed
+func (s *Session) GetState() SessionState {
+	return s.state
 }
 
 func (s *Session) Background() {

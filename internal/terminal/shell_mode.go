@@ -5,6 +5,7 @@ import (
 
 	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/event"
+	"github.com/smavl/gok/internal/misc"
 )
 
 type RawShellMode struct {
@@ -17,6 +18,7 @@ type RawShellMode struct {
 	terminal domain.TerminalController
 	shellCh  chan<- event.ShellByteEvent
 	menuCh   chan<- event.MenuCmdEvent
+	IsEntered bool
 }
 
 func NewRawShellMode(inputMan *InputManagerImpl, terminal domain.TerminalController, shellCh chan<- event.ShellByteEvent, menuCh chan<- event.MenuCmdEvent) *RawShellMode {
@@ -25,10 +27,25 @@ func NewRawShellMode(inputMan *InputManagerImpl, terminal domain.TerminalControl
 		terminal: terminal,
 		shellCh:  shellCh,
 		menuCh:   menuCh,
+		IsEntered: false,
 	}
 }
 
-func (m *RawShellMode) Enter(s domain.Session) {
+func (m *RawShellMode) IsActive() bool {
+	return m.IsEntered
+}
+
+func (m *RawShellMode) SetActive(active bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.IsEntered = active
+}
+
+func (m *RawShellMode) Enter(s domain.Session) error {
+	if m.IsActive() {
+		m.terminal.Message("[!] Already in shell mode. How did you do this??\n")
+		return misc.ErrAlreadyInShellMode
+	}
 	ID := s.GetID()
 
 	m.terminal.Message("[*] Session #%v: Dropping into shell..\n", ID)
@@ -36,9 +53,13 @@ func (m *RawShellMode) Enter(s domain.Session) {
 	m.currentSession = s
 
 	m.terminal.SetRaw()
+	// TODO: Refactor this. Move Foreground() and maybe embed SetActive() ?
 	s.Foreground()
+	m.SetActive(true)
 	s.Write([]byte{'\n'})
 	m.im.SwapReader(NewByteReader(m.shellCh))
+
+	return nil
 }
 
 func (m *RawShellMode) GetActiveSessionId() int {
@@ -51,6 +72,7 @@ func (m *RawShellMode) Exit() {
 
 	// background
 	session.Background()
+	m.SetActive(false)
 
 	// restore the user terminal
 	m.terminal.Restore()

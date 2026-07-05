@@ -133,7 +133,16 @@ func (c *Core ) handleNewSessionEvent(e event.NewSessionEvent) {
 	addr := e.SessionAddr
 	systemOS := e.SystemOS
 	c.terminal.Message("\n[+] %s => New session #%d | %s \n", addr, ID, systemOS)
-	c.terminal.Prompt()
+
+	if c.Config.AutoInteract {
+		c.dispatchShellEntering(ID)
+	} else {
+		c.terminal.Prompt()
+	}
+}
+
+func (c *Core) dispatchShellEntering(ID int) {
+	c.commander.DropIntoShell(ID)
 }
 
 func (c *Core ) handleMenuCmdEvent(e event.MenuCmdEvent) {

@@ -9,4 +9,5 @@ var (
 	NoProberForOs			 	= errors.New("No Prober for OS!")
 	ErrNoProberMode			 	= errors.New("No Prober for Mode!")
 	ErrBinaryNotFound			= errors.New("Binary not found in session")
+	ErrAlreadyInShellMode		= errors.New("Already in shell mode")
 )

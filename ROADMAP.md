@@ -70,6 +70,14 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [ ] Factor out from probe folder?
     - [ ] Compositional design. Current one is delimiter based. 
 
+### Shell mode + utilities
+
+- [ ] Implement custom "agent" protocol
+    - [ ] Better detection of completion of cmds 
+    - [ ] Auto-resize
+    - [ ] Integration with payloads/scripts
+
+
 ### Bugs
 - [x] Have to hit enter to transition from shell to menu mode (and vice versa)
 - [ ] Session is not killed on target when killed in `gok`

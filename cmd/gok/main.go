@@ -46,6 +46,7 @@ func main() {
 		BindIps:           cli.Flags.BoundIPs,
 		ProbingCmdTimeout: cli.Flags.ProbingCmdTimeout,
 		ProbingMode:       cli.Flags.ProbingMode,
+		AutoInteract:      cli.Flags.AutoInteract,
 	}
 
 	c := core.NewCore(config)
