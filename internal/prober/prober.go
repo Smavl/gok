@@ -10,14 +10,14 @@ import (
 )
 
 type Prober struct {
-	sess    types.SessionInterface
+	sess    domain.ProbingSession
 	config  types.ProbeConfig
 	results *types.ProbeResults
 	mode	domain.ProbingMode
 	done bool
 }
 
-func NewProber(sess types.SessionInterface, opts domain.ProbingOptions) (*Prober, error) {
+func NewProber(sess domain.ProbingSession, opts domain.ProbingOptions) (*Prober, error) {
 	cfg, err := config.ConfigForMode(opts.ProbingMode)
 	if err != nil {
 		return nil, err

@@ -9,13 +9,6 @@ import (
 	"github.com/smavl/gok/internal/misc"
 )
 
-// SessionInterface defines the minimal interface that prober needs from a session
-type SessionInterface interface {
-	Write([]byte) (int, error)
-	GetProbingLines() []string
-	ClearProbingBuffer()
-	GetProbingDataChannel() <-chan struct{}
-}
 
 // OS represents the detected operating system
 type OS int
@@ -130,7 +123,7 @@ type BinaryCapability struct {
 	// Version string
 }
 
-type ProbeOperation func(ctx context.Context, sess SessionInterface) (ProbeResult, error)
+type ProbeOperation func(ctx context.Context, sess domain.ProbingSession) (ProbeResult, error)
 
 type PhaseConfig struct {
 	Operations      []ProbeOperation

@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/prober/executor"
 	"github.com/smavl/gok/internal/prober/types"
 )
 
 // WhichStrategy is a implementation of BinaryCheckStrategy
 type WhichStrategy struct {
-	executor *executor.CommandExecutor
+	executor executor.Executor
 }
 
 func NewWhichStrategy() *WhichStrategy {
 	return &WhichStrategy{
-		executor: executor.NewCommandExecutor(),
+		executor: executor.NewDefaultExecutor(),
 	}
 }
 
@@ -29,7 +30,7 @@ func PathWasReturned(s string) bool {
 	return hasPrefix && !hasNegWhichPattern
 }
 
-func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInterface, binary string) (types.BinaryResult, error) {
+func (s *WhichStrategy) CheckExists(ctx context.Context, sess domain.ProbingSession, binary string) (types.BinaryResult, error) {
 	// Build the which command - redirect output to suppress noise
 	cmd := fmt.Sprintf("which %s 2>&1", binary)
 
@@ -65,7 +66,7 @@ func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInter
 
 // exit code base approach (does not return path)
 // Uses `which` to determin the existence of a binary
-// func (s *WhichStrategy) CheckExists(ctx context.Context, sess types.SessionInterface, binary string) (bool, error) {
+// func (s *WhichStrategy) CheckExists(ctx context.Context, sess domain.SessionInterface, binary string) (bool, error) {
 // 	// Build the which command - redirect output to suppress noise
 // 	cmd := fmt.Sprintf("which %s >/dev/null 2>&1", binary)
 //

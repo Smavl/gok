@@ -1,26 +1,33 @@
 package upgrader
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/smavl/gok/internal/domain"
+	"github.com/smavl/gok/internal/prober/executor"
 	"github.com/smavl/gok/internal/prober/types"
 	"golang.org/x/term"
 )
 
 
 type Upgrader struct {
-	// Prober
-	Session domain.Session
+	ctx context.Context
+	Session domain.ProbingSession
 	ProbeResults *types.ProbeResults
+	Executor executor.Executor
 }
 
-func NewUpgrader(session domain.Session, results *types.ProbeResults) *Upgrader {
+func NewUpgrader(ctx context.Context, session domain.ProbingSession, results *types.ProbeResults, executor executor.Executor ) *Upgrader {
 
 	return &Upgrader{
+		ctx: ctx,
 		Session: session,
 		ProbeResults: results,
+		Executor: executor,
 	}
 }
 
@@ -29,23 +36,23 @@ func (u *Upgrader) Upgrade() error {
 	// upgrade shell (PTY)
 	err := u.UpgradePTY()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to upgrade PTY: %w", err)
 	}
 
 	// Export envs
 	err = u.exportENVs()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to export envs: %w", err)
 	}
 	// set tty dims 
 	rows, cols, err := GetTTYSize()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get TTY size: %w", err)
 	}
 
 	err = u.SetTTYSize(rows, cols)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set TTY size: %w", err)
 	}
 
 	return nil
@@ -70,18 +77,15 @@ func determineBestPtyUpgrader(results *types.ProbeResults) (PtySpawner, error){
 }
 
 func (u *Upgrader) Execute(cmd string) error {
+	// timeout context
+	timeout := 5 * time.Second
+	ctx, cancel := context.WithTimeout(u.ctx, timeout)
+	defer cancel()
 
-	// TODO:
-	// Maybe use Executor or something instead of 
-	// writing directly to session!
-	bytes := []byte(cmd)
-	// add newline
-	bytes = append(bytes, '\n')
-	_, err := u.Session.Write(bytes)
+	_, err := u.Executor.Execute(ctx, u.Session, cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute '%s': %w", cmd, err)
 	}
-
 	return nil
 }
 
@@ -93,11 +97,23 @@ func (u *Upgrader) UpgradePTY() error {
 	}
 	ptyUpgradePayload := ptySpawner.GetPayload()
 
-	err = u.Execute(ptyUpgradePayload)
-	// TODO: better error handling
+	// NOTE:
+	// We cant use the Executor for this (e.g. the delimiter based one)
+	// as we cant detect when its done, since the payload will never return
+	bytes := []byte(ptyUpgradePayload)
+	bytes = append(bytes, '\n')
+	_, err = u.Session.Write(bytes)
 	if err != nil {
 		return err
 	}
+
+	// Wait for PTY to spawn
+	time.Sleep(500 * time.Millisecond)
+
+	// Clear any output from PTY spawn (shell prompt, etc.)
+	fmt.Printf("[*] Clearing probing buffer after PTY spawn...\n")
+	u.Session.ClearProbingBuffer()
+
 	return nil
 }
 

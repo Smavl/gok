@@ -14,6 +14,7 @@ import (
 	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/misc"
 	"github.com/smavl/gok/internal/prober"
+	"github.com/smavl/gok/internal/prober/executor"
 	"github.com/smavl/gok/internal/prober/types"
 	"github.com/smavl/gok/internal/upgrader"
 	// "github.com/smavl/gok/internal/session"
@@ -221,7 +222,10 @@ func (s *Session) Start(ctx context.Context) error {
 	// prober has run, we can upgrade the shell at this point
 	// TODO: make sure it is done 
 
-	s.upgradeShell()
+	err = s.upgradeShell()
+	if err != nil {
+		return fmt.Errorf("failed to upgrade shell: %w", err)
+	}
 
 
 	// set state to background again
@@ -233,6 +237,7 @@ func (s *Session) Start(ctx context.Context) error {
 }
 
 func (s *Session) upgradeShell() error {
+	// TODO: Move into NewUpgrader()
 	results, err := s.Prober.GetProbingResultsIfDone()
 	if err != nil {
 		return fmt.Errorf("failed to get probing results for upgrade: %w", err)	
@@ -242,8 +247,11 @@ func (s *Session) upgradeShell() error {
 	s.setState(StateUpgrading)
 	s.mu.Unlock()
 
-	upgrader := upgrader.NewUpgrader(s, results)
+	// TODO: Maybe set Executor in another way
 
+	exec := executor.NewDefaultExecutor()
+
+	upgrader := upgrader.NewUpgrader(s.ctx, s, results, exec)
 
 	return upgrader.Upgrade()
 }
@@ -374,6 +382,15 @@ func (s *Session) outputLoop() {
 				s.probingBuffer.Feed(data)
 				s.mu.Unlock()
 				// signal that probing data is incomming (after releasing lock to avoid blocking)
+				select {
+				case s.probingDataArrived <- struct{}{}:
+				default:
+				}
+				continue
+			case StateUpgrading:
+				// During upgrade, feed to probing buffer for executor to read
+				s.probingBuffer.Feed(data)
+				s.mu.Unlock()
 				select {
 				case s.probingDataArrived <- struct{}{}:
 				default:

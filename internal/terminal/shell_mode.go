@@ -12,7 +12,7 @@ type RawShellMode struct {
 	mu            sync.Mutex
 	activeShellID int
 
-	currentSession domain.Session
+	currentSession domain.InteractiveSession
 
 	im       *InputManagerImpl
 	terminal domain.TerminalController
@@ -41,7 +41,7 @@ func (m *RawShellMode) SetActive(active bool) {
 	m.IsEntered = active
 }
 
-func (m *RawShellMode) Enter(s domain.Session) error {
+func (m *RawShellMode) Enter(s domain.InteractiveSession) error {
 	if m.IsActive() {
 		m.terminal.Message("[!] Already in shell mode. How did you do this??\n")
 		return misc.ErrAlreadyInShellMode

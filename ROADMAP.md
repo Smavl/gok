@@ -80,8 +80,8 @@ To plan a little ahead below are goals of the next development iterations of `go
 
 ### Bugs
 - [x] Have to hit enter to transition from shell to menu mode (and vice versa)
-- [ ] Session is not killed on target when killed in `gok`
-- [ ] Newline is not added when a new session is lands when inside a raw one ( or formatting is wrong in some other way)
+- [ ] Session is not killed on target when killed in `gok` (pty spawn thing)
+- [ ] Newline is not added when a new session lands when inside a raw one ( or formatting is wrong in some other way)
 - [ ] ...
 
 ### Logging:
@@ -98,7 +98,7 @@ To plan a little ahead below are goals of the next development iterations of `go
 
 ### Prober
 - [x] Prober Builder
-- [ ] Better strategies: like: `which` -> better BinaryCheckStrategy (multiple in one command) (check if base64 before maybe too)
+- [~] Better strategies: like: `which` -> better BinaryCheckStrategy (multiple in one command) (check if base64 before maybe too)
 - [x] Modes:
     - [x] Default,
     - [x] Agressive
@@ -108,6 +108,16 @@ To plan a little ahead below are goals of the next development iterations of `go
 - [ ] History (up, down)
 - [ ] Tab completion
 - [ ] Session details (info from the prober?)
+
+
+### Unit Tests
+- [ ] Test Prober and Upgrader Executor parsing
+
+### Integration Tests
+- [x] Test `AutoInteract` flag
+- [ ] Test `sh` also
+- [ ] Test a command simple injection on a service
+- [ ] Test multiple targets (containers) at the same time
 
 
 ## Version 1.0 - Goals

@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/prober/strategy"
 	"github.com/smavl/gok/internal/prober/types"
 )
@@ -14,7 +15,7 @@ func EnumerateBinaries(
 	primaryStrategy strategy.BinaryCheckStrategy,
 	fallbackStrategies []strategy.BinaryCheckStrategy,
 ) types.ProbeOperation {
-	return func(ctx context.Context, sess types.SessionInterface) (types.ProbeResult, error) {
+	return func(ctx context.Context, sess domain.ProbingSession) (types.ProbeResult, error) {
 		found := types.BinaryResults{}
 
 		for _, binary := range binaries {
