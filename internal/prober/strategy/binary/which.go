@@ -30,7 +30,7 @@ func PathWasReturned(s string) bool {
 	return hasPrefix && !hasNegWhichPattern
 }
 
-func (s *WhichStrategy) CheckExists(ctx context.Context, sess domain.ProbingSession, binary string) (types.BinaryResult, error) {
+func (s *WhichStrategy) CheckExists(ctx context.Context, sess domain.CommandSession, binary string) (types.BinaryResult, error) {
 	// Build the which command - redirect output to suppress noise
 	cmd := fmt.Sprintf("which %s 2>&1", binary)
 

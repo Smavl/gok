@@ -16,12 +16,12 @@ import (
 
 type Upgrader struct {
 	ctx context.Context
-	Session domain.ProbingSession
+	Session domain.CommandSession
 	ProbeResults *types.ProbeResults
 	Executor executor.Executor
 }
 
-func NewUpgrader(ctx context.Context, session domain.ProbingSession, results *types.ProbeResults, executor executor.Executor ) *Upgrader {
+func NewUpgrader(ctx context.Context, session domain.CommandSession, results *types.ProbeResults, executor executor.Executor ) *Upgrader {
 
 	return &Upgrader{
 		ctx: ctx,
@@ -111,7 +111,6 @@ func (u *Upgrader) UpgradePTY() error {
 	time.Sleep(500 * time.Millisecond)
 
 	// Clear any output from PTY spawn (shell prompt, etc.)
-	fmt.Printf("[*] Clearing probing buffer after PTY spawn...\n")
 	u.Session.ClearProbingBuffer()
 
 	return nil

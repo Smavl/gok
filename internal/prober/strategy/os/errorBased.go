@@ -54,7 +54,7 @@ func inferOsByError(output []string) (types.OS, error) {
 	return resultOS, resultErr
 }
 
-func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess domain.ProbingSession) (types.OS, error) {
+func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess domain.CommandSession) (types.OS, error) {
 	// random shell command / builtin / binary
 	rcmd := rand.Text()[:8]
 	cmd := fmt.Sprintf("%s 2>&1", rcmd)

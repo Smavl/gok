@@ -11,9 +11,9 @@ import (
 
 // BinaryCheckStrategy: Techniques to check the existence of a binary
 type BinaryCheckStrategy interface {
-	CheckExists(ctx context.Context, sess domain.ProbingSession, binary string) (types.BinaryResult, error)
+	CheckExists(ctx context.Context, sess domain.CommandSession, binary string) (types.BinaryResult, error)
 }
 
 type OSDetectionStrategy interface {
-	DetermineOS(ctx context.Context, sess domain.ProbingSession) (types.OS, error)	
+	DetermineOS(ctx context.Context, sess domain.CommandSession) (types.OS, error)	
 }

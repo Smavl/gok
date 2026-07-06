@@ -19,7 +19,7 @@ func NewRandomDelimExecutor() *RandomDelimExecutor {
 
 
 // ExecuteWithExitCode executes a command and returns its exit code
-func (e *RandomDelimExecutor) ExecuteWithExitCode(ctx context.Context, sess domain.ProbingSession, cmd string) (int, error) {
+func (e *RandomDelimExecutor) ExecuteWithExitCode(ctx context.Context, sess domain.CommandSession, cmd string) (int, error) {
 	sess.ClearProbingBuffer()
 
 	delimiter := generateDelimiter()
@@ -48,7 +48,7 @@ func (e *RandomDelimExecutor) ExecuteWithExitCode(ctx context.Context, sess doma
 }
 
 // Execute runs a command and returns the output lines
-func (e *RandomDelimExecutor) Execute(ctx context.Context, sess domain.ProbingSession, cmd string) ([]string, error) {
+func (e *RandomDelimExecutor) Execute(ctx context.Context, sess domain.CommandSession, cmd string) ([]string, error) {
 	sess.ClearProbingBuffer()
 
 	delimiter := generateDelimiter()
@@ -73,7 +73,7 @@ func (e *RandomDelimExecutor) Execute(ctx context.Context, sess domain.ProbingSe
 }
 
 // waitForDelimiter waits for the delimiter to appear in output
-func (e *RandomDelimExecutor) waitForDelimiter(ctx context.Context, sess domain.ProbingSession, delimiter string) bool {
+func (e *RandomDelimExecutor) waitForDelimiter(ctx context.Context, sess domain.CommandSession, delimiter string) bool {
 	dataChannel := sess.GetProbingDataChannel()
 
 	for {

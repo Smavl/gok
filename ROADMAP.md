@@ -56,7 +56,7 @@ To plan a little ahead below are goals of the next development iterations of `go
         - [x] Upgrade the TTY/PTY
         - [x] Export ENV vars
         - [x] Set `stty` size
-    - [ ] CLI flag: Automatically drop into shell (default)
+    - [x] CLI flag: Automatically drop into shell (default)
 
 ## Future versions:
 

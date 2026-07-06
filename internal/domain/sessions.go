@@ -8,8 +8,8 @@ type InteractiveSession interface {
 	Write([]byte) (int, error)
 }
 
-// ProbingSession defines the minimal interface that prober needs from a session
-type ProbingSession interface {
+// CommandSession defines the minimal interface that prober needs from a session
+type CommandSession interface {
 	Write([]byte) (int, error)
 	GetProbingLines() []string
 	ClearProbingBuffer()

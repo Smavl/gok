@@ -16,7 +16,7 @@ func DetectOS(
 	primaryStrategy strategy.OSDetectionStrategy,
 	fallbackStrategies []strategy.OSDetectionStrategy,
 ) types.ProbeOperation {
-	return func(ctx context.Context, sess domain.ProbingSession) (types.ProbeResult, error) {
+	return func(ctx context.Context, sess domain.CommandSession) (types.ProbeResult, error) {
 
 		// Run primary strategy 
 		OSres, err := primaryStrategy.DetermineOS(ctx, sess)

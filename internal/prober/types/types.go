@@ -123,7 +123,7 @@ type BinaryCapability struct {
 	// Version string
 }
 
-type ProbeOperation func(ctx context.Context, sess domain.ProbingSession) (ProbeResult, error)
+type ProbeOperation func(ctx context.Context, sess domain.CommandSession) (ProbeResult, error)
 
 type PhaseConfig struct {
 	Operations      []ProbeOperation
