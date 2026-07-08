@@ -13,7 +13,8 @@ func TestPhaseBuilderContextPropagation(t *testing.T) {
 	// Given: Genesis detected Linux, Initial found binaries
 	results := &types.ProbeResults{
 		OS:            types.LinuxOs,
-		BinariesFound: []string{},
+		BinariesResults: types.BinaryResults{},
+		EnvResults: types.EnvResult{},
 	}
 
 	bctx := types.PhaseBuilderContext{
@@ -30,7 +31,14 @@ func TestPhaseBuilderContextPropagation(t *testing.T) {
 	require.NotNil(t, initialPhase)
 
 	// FAKE binaries found by initial phase
-	results.BinariesFound = append(results.BinariesFound, "which", "python3")
+	// results.BinariesFound = append(results.BinariesFound, "which", "python3")
+	fakeResults := types.BinaryResults{
+		Binaries: []types.BinaryResult{
+			{Name: "which", Found: true},
+			{Name: "python3", Found: true},
+		},
+	}
+	fakeResults.Apply(results)
 
 	// When: Recon phase is built with accumulated context
 	reconPhase, present := builder.BuildReconPhase(bctx)
@@ -39,8 +47,12 @@ func TestPhaseBuilderContextPropagation(t *testing.T) {
 	require.False(t, present) // Not implemented yet
 	require.Nil(t, reconPhase)
 	require.Equal(t, types.LinuxOs, bctx.ProbeResults.OS)
-	require.Contains(t, bctx.ProbeResults.BinariesFound, "which")
-	require.Contains(t, bctx.ProbeResults.BinariesFound, "python3")
+	// require.Contains(t, bctx.ProbeResults.BinariesFound, "which")
+	// require.Contains(t, bctx.ProbeResults.BinariesFound, "python3")
+	require.True(t, len(bctx.ProbeResults.BinariesResults.Binaries) > 0)
+	require.True(t, bctx.ProbeResults.HasBinary("which"))
+	require.True(t, bctx.ProbeResults.HasBinary("python3"))
+
 }
 
 func TestModeSelection(t *testing.T) {

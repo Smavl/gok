@@ -48,10 +48,25 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [x] Add back OS detection?
     - [x] Finish Default probe config (Operations), at least some okay state
 
-## Version 0.3 - Shell upgrading
-- [ ] Automatic shell upgrading 
-    - [ ] Simple shell upgrading implementation (python)
-    - [ ] CLI flag: Automatically drop into shell (default)
+## Version 0.3 - Simple Shell upgrading
+- [x] Automatic shell upgrading 
+    - [x] Simple shell upgrading implementation (python)
+    - [x] Add shell upgrading features:
+        - [x] ptyUpgradePayload logic
+        - [x] Upgrade the TTY/PTY
+        - [x] Export ENV vars
+        - [x] Set `stty` size
+    - [x] CLI flag: Automatically drop into shell (default)
+
+## Version 0.4 - "Agent" protocol
+- [ ] Refactor session transport (prepare for multiplexer)
+- [ ] Implement custom protocol
+- [ ] Implement multiplexer (python)
+- [ ] Refactor executor logic to be able to use "agent"
+- [ ] Implement fallback "agents" / multiplexing techniques
+    - [ ] simple +1 tcp connection with bash fd
+- [ ] Implement binary agent 
+- [ ] Implement fallback logic depending on if only some fallback or none can be deployed
 
 ## Future versions:
 
@@ -65,9 +80,24 @@ To plan a little ahead below are goals of the next development iterations of `go
     - [ ] Factor out from probe folder?
     - [ ] Compositional design. Current one is delimiter based. 
 
+### Shell mode + utilities
+
+- [ ] Implement custom "agent" protocol
+    - [ ] Better detection of completion of cmds 
+    - [ ] Auto-resize
+    - [ ] Integration with payloads/scripts
+
+
 ### Bugs
 - [x] Have to hit enter to transition from shell to menu mode (and vice versa)
+- [ ] Session is not killed on target when killed in `gok` (pty spawn thing)
+- [ ] Newline is not added when a new session lands when inside a raw one ( or formatting is wrong in some other way)
+- [ ] When no PTY upgrade is available, then the session will not be usable
 - [ ] ...
+
+### UX "bugs"
+- [ ] When a shell lands during an interactive session, and then when the user returns to the menu the second session is not announced (implement queue?)
+
 
 ### Logging:
 - [ ] Debugging- and/or general logs
@@ -83,7 +113,7 @@ To plan a little ahead below are goals of the next development iterations of `go
 
 ### Prober
 - [x] Prober Builder
-- [ ] Better strategies: like: `which` -> better BinaryCheckStrategy (multiple in one command) (check if base64 before maybe too)
+- [~] Better strategies: like: `which` -> better BinaryCheckStrategy (multiple in one command) (check if base64 before maybe too)
 - [x] Modes:
     - [x] Default,
     - [x] Agressive
@@ -93,6 +123,17 @@ To plan a little ahead below are goals of the next development iterations of `go
 - [ ] History (up, down)
 - [ ] Tab completion
 - [ ] Session details (info from the prober?)
+
+
+### Unit Tests
+- [ ] Test Prober and Upgrader Executor parsing
+
+### Integration Tests
+- [x] Test `AutoInteract` flag
+- [x] Test `AutoInteract` flag with two concurrent (test for race)
+- [ ] Test `sh` also
+- [ ] Test a command simple injection on a service
+- [ ] Test multiple targets (containers) at the same time
 
 
 ## Version 1.0 - Goals
@@ -118,8 +159,8 @@ Below are features that are interesting and might get implemented (+ and noted d
     - [ ] windows
 - [ ] Session handling
     - [x] print history after entering session again
-- [ ] Automatic shell upgrader (uses Prober?)
-    - [ ] python
+- [ ] Automatic shell upgrader
+    - [x] python
     - [ ] script
     - [ ] perl
     - [ ] php
@@ -147,7 +188,7 @@ Below are features that are interesting and might get implemented (+ and noted d
 
 ### Prober - Executor 
 - [x] Delimiter based
-- [ ] Add more strategies 
+- [x] Add more strategies 
 
 ## Menu mode
 

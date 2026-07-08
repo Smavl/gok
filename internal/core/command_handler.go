@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/session"
@@ -51,22 +52,40 @@ func (ch *CommandHandler) listListeners() {
 func (ch *CommandHandler) interact(args []string) {
 	// check if session arg is supplied
 	if len(args) == 2 {
-		id, err := strconv.Atoi(args[1])
+		ID, err := strconv.Atoi(args[1])
 		if err != nil {
-			ch.terminal.Message("Id: %v is not a number\n", id)
+			ch.terminal.Message("Id: %v is not a number\n", ID)
 			return
 		}
 
-		session, err := ch.sessions.Get(id)
-
-		if err == nil {
-			ch.shellMode.Enter(session)
-		} else {
-			ch.terminal.Message("Session #%d not found\n", id)
-		}
+		ch.DropIntoShell(ID)
 
 	} else {
 		ch.terminal.Message("[!] No session chosen, or invalid argument\n")
+	}
+}
+
+func (ch *CommandHandler) DropIntoShell(ID int) {
+	s, err := ch.sessions.Get(ID)
+	if err != nil {
+		ch.terminal.Message("Session #%d not found\n", ID)
+		return
+	}
+
+	// wait for upgrader and prober to finish
+	timeout := time.Now().Add(10 * time.Second)
+	// get lock
+	for s.GetState() != session.StateBackgrounded {
+		if time.Now().After(timeout) {
+			ch.terminal.Message("[!] Timed out waiting for prober or upgrader (session %d)\n", ID)
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if err := ch.shellMode.Enter(s); err != nil {
+		ch.terminal.Message("[!] %v\n")
+		return
 	}
 }
 

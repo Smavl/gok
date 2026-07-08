@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	// "os"
 	"strings"
 	"sync"
 	"time"
@@ -12,7 +14,10 @@ import (
 	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/misc"
 	"github.com/smavl/gok/internal/prober"
+	"github.com/smavl/gok/internal/prober/executor"
 	"github.com/smavl/gok/internal/prober/types"
+	"github.com/smavl/gok/internal/upgrader"
+	// "github.com/smavl/gok/internal/session"
 )
 
 type SessionState int
@@ -23,6 +28,7 @@ const (
 	StateBackgrounded
 	StateDead
 	StateProbing
+	StateUpgrading
 	// StateIdle
 )
 
@@ -73,9 +79,10 @@ func CreateLineBuffer(maxLines int) *HistoryLineBuffer {
 }
 
 type SessionInfo struct {
-	OS types.OS
-	binaries []string
+	OS       types.OS
+	binaries []types.BinaryResult
 }
+
 // type SystemInfo struct {
 // 	OS types.OS
 // }
@@ -93,9 +100,9 @@ type Session struct {
 	// probing
 	probingBuffer      *HistoryLineBuffer
 	probingDataArrived chan struct{}
-	SessionInfo         SessionInfo
+	SessionInfo        SessionInfo
 	Prober             *prober.Prober
-	ProbingOptions domain.ProbingOptions
+	ProbingOptions     domain.ProbingOptions
 
 	// context things
 	ctx    context.Context
@@ -108,17 +115,17 @@ func (s *Session) GetID() int {
 }
 
 type SessionManager struct {
-	mu          sync.RWMutex
-	currentID   int
-	sessions    map[int]*Session
-	probOpts domain.ProbingOptions 
+	mu        sync.RWMutex
+	currentID int
+	sessions  map[int]*Session
+	probOpts  domain.ProbingOptions
 }
 
 func NewSessionManager(probingOpts domain.ProbingOptions) *SessionManager {
 	return &SessionManager{
-		currentID:   0,
-		sessions:    make(map[int]*Session),
-		probOpts: probingOpts,
+		currentID: 0,
+		sessions:  make(map[int]*Session),
+		probOpts:  probingOpts,
 		// ProbingOpTimout: probingOpTimeout,
 	}
 }
@@ -140,9 +147,9 @@ func (sm *SessionManager) AddSession(conn net.Conn, display io.Writer) (*Session
 		history:            CreateLineBuffer(defaultHistoryMaxLines),
 		probingBuffer:      CreateLineBuffer(defaultHistoryMaxLines),
 		probingDataArrived: make(chan struct{}),
-		SessionInfo:         SessionInfo{},
+		SessionInfo:        SessionInfo{},
 		// probingMode:        sm.probOpts.ProbingMode,
-		ProbingOptions:   sm.probOpts,
+		ProbingOptions: sm.probOpts,
 	}
 
 	sm.mu.Lock()
@@ -191,7 +198,6 @@ func (sm *SessionManager) Get(ID int) (*Session, error) {
 	return sesh, nil
 }
 
-
 // At this point the shell has landed
 func (s *Session) Start(ctx context.Context) error {
 	s.mu.Lock()
@@ -212,7 +218,42 @@ func (s *Session) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to probe session: %w", err)
 	}
+
+	// prober has run, we can upgrade the shell at this point
+	// TODO: make sure it is done 
+
+	err = s.upgradeShell()
+	if err != nil {
+		return fmt.Errorf("failed to upgrade shell: %w", err)
+	}
+
+
+	// set state to background again
+	s.mu.Lock()
+	s.state = StateBackgrounded
+	s.mu.Unlock()
+
 	return nil
+}
+
+func (s *Session) upgradeShell() error {
+	// TODO: Move into NewUpgrader()
+	results, err := s.Prober.GetProbingResultsIfDone()
+	if err != nil {
+		return fmt.Errorf("failed to get probing results for upgrade: %w", err)	
+	}
+
+	s.mu.Lock()
+	s.setState(StateUpgrading)
+	s.mu.Unlock()
+
+	// TODO: Maybe set Executor in another way
+
+	exec := executor.NewDefaultExecutor()
+
+	upgrader := upgrader.NewUpgrader(s.ctx, s, results, exec)
+
+	return upgrader.Upgrade()
 }
 
 func (s *Session) probeSession() error {
@@ -220,7 +261,7 @@ func (s *Session) probeSession() error {
 	s.setState(StateProbing)
 	s.mu.Unlock()
 
-	// For now when both the prober is sucessfully run, or fails set the state to Backgrounded
+	// NOTE: For now when both the prober is sucessfully run, or fails set the state to Backgrounded
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -253,7 +294,6 @@ func (s *Session) probeSession() error {
 	}
 	s.consumeProbingResults(pres)
 
-
 	return nil
 }
 
@@ -261,7 +301,7 @@ func (s *Session) consumeProbingResults(pr *types.ProbeResults) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.SessionInfo.OS = pr.OS
-	s.SessionInfo.binaries = pr.BinariesFound
+	s.SessionInfo.binaries = s.Prober.GetBinaryResults()
 }
 
 func (s *Session) GetProbingLines() []string {
@@ -347,6 +387,15 @@ func (s *Session) outputLoop() {
 				default:
 				}
 				continue
+			case StateUpgrading:
+				// During upgrade, feed to probing buffer for executor to read
+				s.probingBuffer.Feed(data)
+				s.mu.Unlock()
+				select {
+				case s.probingDataArrived <- struct{}{}:
+				default:
+				}
+				continue
 			case StateDead:
 				s.mu.Unlock()
 				return
@@ -355,6 +404,30 @@ func (s *Session) outputLoop() {
 		}
 	}
 }
+
+
+// func debugByteData(data []byte) {
+//   	// Print the string representation
+//   	fmt.Printf("[*] String: %s\n", string(data))
+//
+//   	// Print byte breakdown
+//   	var sb strings.Builder
+//   	sb.WriteString("[")
+//   	for i, b := range data {
+//   		if i > 0 {
+//   			sb.WriteString(", ")
+//   		}
+//   		// Handle printable vs non-printable characters
+//   		if b >= 32 && b <= 126 {
+//   			fmt.Fprintf(&sb, "%d -> '%c'", b, b)
+//   		} else {
+//   			// Show non-printable as just the byte value
+//   			fmt.Fprintf(&sb, "%d", b)
+//   		}
+//   	}
+//   	sb.WriteString("]\n")
+//   	fmt.Print(sb.String())
+// }
 
 // send data to the remote session
 func (s *Session) Write(p []byte) (int, error) {
@@ -366,10 +439,11 @@ func (s *Session) Write(p []byte) (int, error) {
 	return s.conn.Write(p)
 }
 
-// foregound the session to the user
+// foreground the session to the user
 func (s *Session) Foreground() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// TODO: Add state validation (state machine?)
 	s.setState(StateActive)
 
 	if len(s.history.lines) > 0 {
@@ -381,9 +455,18 @@ func (s *Session) Foreground() {
 	}
 }
 
-// The caller should lock themselves
+// NOTE: The caller should lock themselves
 func (s *Session) setState(state SessionState) {
 	s.state = state
+}
+
+
+// NOTE: Should caller lock themselves? or should the method?
+// TODO: Determin lock policy
+func (s *Session) GetState() SessionState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state
 }
 
 func (s *Session) Background() {

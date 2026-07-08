@@ -17,17 +17,21 @@ var Flags struct {
 	ProbingCmdTimeout time.Duration `help:"Timeout for probing commands" default:"200ms" short:"t"`
 	ProbingMode domain.ProbingMode `help:"Level of agressiveness for the prober" default:"0" short:"A"`
 	DisableProber bool `help:"Disable the prober" default:"false" short:"D"`
+	AutoInteract bool `help:"Automatically 'interact' with session upon successful connection" default:"false" short:"F"` // "F" for "fast" ?
 }
 
 type Config struct {
 	// listener config
-	BindIps           []string
-	PortRange         PortRange
+	BindIps				[]string
+	PortRange			PortRange
 	// probing config
-	ProbingCmdTimeout time.Duration
-	ProbingMode       domain.ProbingMode
+	ProbingCmdTimeout	time.Duration
+	ProbingMode			domain.ProbingMode
 	// TODO: add logic validation
-	DisableProber     bool
+	DisableProber		bool
+
+	// session settings
+	AutoInteract		bool
 
 	// misc
 	// TODO: testmode/headless mode

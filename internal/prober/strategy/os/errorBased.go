@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/smavl/gok/internal/domain"
 	"github.com/smavl/gok/internal/prober/executor"
 	"github.com/smavl/gok/internal/prober/types"
 )
@@ -13,12 +14,12 @@ import (
 // OSError is an implementation of OSDetectionStrategy
 // Which relies on error messages to determine the OS
 type OSErrorDetectionStrategy struct {
-	executor *executor.CommandExecutor
+	executor executor.Executor
 }
 
 func NewOSErrorDetectionStrategy() *OSErrorDetectionStrategy {
 	return &OSErrorDetectionStrategy{
-		executor: executor.NewCommandExecutor(),
+		executor: executor.NewDefaultExecutor(),
 	}
 }
 
@@ -53,7 +54,7 @@ func inferOsByError(output []string) (types.OS, error) {
 	return resultOS, resultErr
 }
 
-func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess types.SessionInterface) (types.OS, error) {
+func (s *OSErrorDetectionStrategy) DetermineOS(ctx context.Context, sess domain.CommandSession) (types.OS, error) {
 	// random shell command / builtin / binary
 	rcmd := rand.Text()[:8]
 	cmd := fmt.Sprintf("%s 2>&1", rcmd)
