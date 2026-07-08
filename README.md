@@ -1,5 +1,18 @@
-Gok - (Reverse) Shell Handler 
+Gok
 ===
+
+```
+   ▄████  ▒█████   ██ ▄█▀
+  ██▒ ▀█▒▒██▒  ██▒ ██▄█▒
+ ▒██░▄▄▄░▒██░  ██▒▓███▄░
+ ░▓█  ██▓▒██   ██░▓██ █▄
+ ░▒▓███▀▒░ ████▓▒░▒██▒ █▄
+  ░▒   ▒ ░ ▒░▒░▒░ ▒ ▒▒ ▓▒
+   ░   ░   ░ ▒ ▒░ ░ ░▒ ▒░
+ ░ ░   ░ ░ ░ ░ ▒  ░ ░░ ░
+       ░     ░ ░  ░  ░
+```
+
 Gok is a feature-rich (reverse) shell handler and offensive utility tool. 
 
 Gok aims to replace the muscle memory of `nc -lvnp 9001` with `gok -p 9001`, and to fast-track the exploitation and/or enumeration process immediately after the shell lands. By providing essential utilities and features, it remains useful beyond landing and upgrading the shell.
@@ -14,6 +27,7 @@ Gok aims to replace the muscle memory of `nc -lvnp 9001` with `gok -p 9001`, and
 - Prober: Automatically gather information
 - (Somewhat) Asynchronous and event-driven architecture
 - Cross-platform support (Linux, Windows, MacOS) (WIP)
+- Multiplexing
 
 ## Interfactive Modes
 - Menu mode - Management and overview
@@ -28,7 +42,7 @@ Gok aims to replace the muscle memory of `nc -lvnp 9001` with `gok -p 9001`, and
   - Utility: download, upload tools
 
 ## Prober
-**Modes**: Default, Agressive (WIP), stealth (WIP)
+**Modes**: Default, Agressive (WIP), Stealth (WIP)
 
 Default:
 - OS detection
@@ -95,6 +109,7 @@ Available Commands:
 ```
 
 **Session interaction:**
+- Drop into the shell: `interact n`, `int n`, `i n`
 - Escape by hitting `Ctrl+D` to background the session and return to menu mode
 
 
