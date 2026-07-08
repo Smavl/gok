@@ -74,15 +74,19 @@ func (ch *CommandHandler) DropIntoShell(ID int) {
 
 	// wait for upgrader and prober to finish
 	timeout := time.Now().Add(10 * time.Second)
+	// get lock
 	for s.GetState() != session.StateBackgrounded {
 		if time.Now().After(timeout) {
-			ch.terminal.Message("[!] Timed out waiting for prober or upgrader\n", ID)
+			ch.terminal.Message("[!] Timed out waiting for prober or upgrader (session %d)\n", ID)
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	ch.shellMode.Enter(s)
+	if err := ch.shellMode.Enter(s); err != nil {
+		ch.terminal.Message("[!] %v\n")
+		return
+	}
 }
 
 func (ch *CommandHandler) killSession(args []string) {

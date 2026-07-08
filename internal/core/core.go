@@ -129,13 +129,22 @@ func (c *Core) Start() {
 
 // Triggered when a shell lands
 func (c *Core ) handleNewSessionEvent(e event.NewSessionEvent) {
+	// TODO: Should we announce this inside a interactive session?
+	// For now ignore it!
+
+	// if triggered while inside interactive session
+	if c.shellMode.IsActive() {
+		// ignore it
+		return
+	}
 	ID := e.SessionID
 	addr := e.SessionAddr
 	systemOS := e.SystemOS
 	c.terminal.Message("\n[+] %s => New session #%d | %s \n", addr, ID, systemOS)
 
 	if c.Config.AutoInteract {
-		c.dispatchShellEntering(ID)
+		// avoid blocking by using go routine
+		go c.dispatchShellEntering(ID)
 	} else {
 		c.terminal.Prompt()
 	}

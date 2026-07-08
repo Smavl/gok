@@ -461,8 +461,11 @@ func (s *Session) setState(state SessionState) {
 }
 
 
-// NOTE: The caller should lock themselves if needed
+// NOTE: Should caller lock themselves? or should the method?
+// TODO: Determin lock policy
 func (s *Session) GetState() SessionState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.state
 }
 

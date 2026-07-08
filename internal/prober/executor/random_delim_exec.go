@@ -68,7 +68,6 @@ func (e *RandomDelimExecutor) Execute(ctx context.Context, sess domain.CommandSe
 
 	// Get output lines (excluding delimiter line)
 	lines := sess.GetProbingLines()
-	lines = filterDelimiterLine(lines, delimiter)
 	return filterDelimiterLine(lines, delimiter), nil
 }
 
